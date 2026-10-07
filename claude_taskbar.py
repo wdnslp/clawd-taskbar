@@ -140,7 +140,6 @@ class ClaudeTaskbarWidget(QWidget):
 
         # Fullscreen & Taskbar Hole integration state
         self.hidden_by_fullscreen = False
-        self.taskbar_bg_color = None
         self._tray_hole_active = False
 
         # Load all sprites and animations
@@ -182,36 +181,12 @@ class ClaudeTaskbarWidget(QWidget):
 
     # --- Windows Topmost Maintenance & Shell Integration ---
 
-    def _sample_taskbar_bg(self, tray):
-        """Samples the exact taskbar pixel color near Claude for seamless background blending."""
-        if self.taskbar_bg_color is not None:
-            return
-        if not user32 or not gdi32:
-            self.taskbar_bg_color = QColor(32, 32, 32)
-            return
-        try:
-            sample_x = max(10, self.x() - 15)
-            sample_y = self.y() + (self.height() // 2)
-            hdc = user32.GetDC(0)
-            if hdc:
-                color_ref = gdi32.GetPixel(hdc, sample_x, sample_y)
-                user32.ReleaseDC(0, hdc)
-                if color_ref != 0xFFFFFFFF and color_ref != -1:
-                    r = color_ref & 0xFF
-                    g = (color_ref >> 8) & 0xFF
-                    b = (color_ref >> 16) & 0xFF
-                    self.taskbar_bg_color = QColor(r, g, b)
-                    return
-        except Exception:
-            pass
-        self.taskbar_bg_color = QColor(32, 32, 32)
-
     def update_taskbar_hole(self):
         """
         In 'bottom' mode (inside taskbar), carves a precise region hole in Shell_TrayWnd
-        at Claude's bounding box. This prevents Desktop Window Manager (DWM) from
-        compositing the taskbar over Claude when the Windows Start Menu, Action Center,
-        or any shell panel is opened. Claude remains permanently 100% visible!
+        tightly around Claude's actual visible body. This preserves the top surface and
+        border of the taskbar (eliminating any black boxes above Claude) while ensuring
+        DWM never occludes Claude when Start Menu or Windows panels are open.
         """
         if not user32 or not gdi32:
             return
@@ -233,22 +208,24 @@ class ClaudeTaskbarWidget(QWidget):
             tray_w = r.right - r.left
             tray_h = r.bottom - r.top
 
+            scale = self.scale_factor
             local_x = self.x() - r.left
-            hole_w = self.width()
+            local_y = self.y() - r.top
 
-            if local_x + hole_w <= 0 or local_x >= tray_w:
+            # Carve tightly around Claude's body only (keeping top of taskbar 100% intact)
+            x1 = max(0, local_x + (2 * scale))
+            x2 = min(tray_w, local_x + (14 * scale))
+            y1 = max(0, local_y + (3 * scale))
+            y2 = tray_h
+
+            if x2 <= x1 or y2 <= y1 or x1 >= tray_w or y1 >= tray_h:
                 if self._tray_hole_active:
                     user32.SetWindowRgn(tray, None, True)
                     self._tray_hole_active = False
                 return
 
-            x1 = max(0, local_x)
-            x2 = min(tray_w, local_x + hole_w)
-
-            self._sample_taskbar_bg(tray)
-
             r_full = gdi32.CreateRectRgn(0, 0, tray_w, tray_h)
-            r_hole = gdi32.CreateRectRgn(x1, 0, x2, tray_h)
+            r_hole = gdi32.CreateRectRgn(x1, y1, x2, y2)
             r_diff = gdi32.CreateRectRgn(0, 0, 0, 0)
             gdi32.CombineRgn(r_diff, r_full, r_hole, 4)  # RGN_DIFF = 4
 
@@ -723,10 +700,8 @@ class ClaudeTaskbarWidget(QWidget):
             self.move(self.clamp_position(self.get_default_position()))
 
     def paintEvent(self, event):
-        painter = QPainter(self)
-        if self.placement_mode == "bottom" and self.taskbar_bg_color is not None:
-            painter.fillRect(self.rect(), self.taskbar_bg_color)
         if self.current_pixmap:
+            painter = QPainter(self)
             painter.drawPixmap(0, 0, self.current_pixmap)
 
     def set_scale(self, factor):
