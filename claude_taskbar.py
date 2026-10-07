@@ -125,10 +125,11 @@ class ClaudeTaskbarWidget(QWidget):
         self.idle_timer.timeout.connect(self._trigger_random_idle_action)
         self._schedule_next_idle(10000, 20000)
 
-        # Gentle Z-order monitor: checks once a second only if taskbar actually occluded Claude
+        # Ultra-fast Z-order monitor: checks every 1 ms so Claude never stays occluded
+        self._cached_trays = set()
         self.zorder_monitor_timer = QTimer(self)
         self.zorder_monitor_timer.timeout.connect(self._check_zorder_safety)
-        self.zorder_monitor_timer.start(1000)
+        self.zorder_monitor_timer.start(1)
 
         # Fullscreen detection timer: runs every 800ms only if enabled
         self.fullscreen_timer = QTimer(self)
@@ -145,6 +146,13 @@ class ClaudeTaskbarWidget(QWidget):
         super().showEvent(event)
         self.setup_taskbar_ownership()
 
+    def get_trays(self):
+        if not self._cached_trays and user32:
+            hwnd_tray = user32.FindWindowW("Shell_TrayWnd", None)
+            hwnd_tray2 = user32.FindWindowW("Shell_SecondaryTrayWnd", None)
+            self._cached_trays = {h for h in (hwnd_tray, hwnd_tray2) if h}
+        return self._cached_trays
+
     def setup_taskbar_ownership(self):
         """
         Sets Shell_TrayWnd as the Win32 OWNER of Claude's top-level window.
@@ -155,7 +163,8 @@ class ClaudeTaskbarWidget(QWidget):
             return
         try:
             hwnd = int(self.winId())
-            tray_hwnd = user32.FindWindowW("Shell_TrayWnd", None)
+            trays = self.get_trays()
+            tray_hwnd = next(iter(trays)) if trays else None
             if tray_hwnd:
                 SetWindowLongPtr(hwnd, GWLP_HWNDPARENT, tray_hwnd)
             self.assert_topmost()
@@ -178,14 +187,12 @@ class ClaudeTaskbarWidget(QWidget):
             return False
         try:
             hwnd = int(self.winId())
-            hwnd_tray = user32.FindWindowW("Shell_TrayWnd", None)
-            hwnd_tray2 = user32.FindWindowW("Shell_SecondaryTrayWnd", None)
-            trays = {h for h in (hwnd_tray, hwnd_tray2) if h}
+            trays = self.get_trays()
             if not trays:
                 return False
 
             curr = hwnd
-            for _ in range(30):
+            for _ in range(25):
                 curr = user32.GetWindow(curr, GW_HWNDPREV)
                 if not curr:
                     break
@@ -196,7 +203,7 @@ class ClaudeTaskbarWidget(QWidget):
             return False
 
     def _check_zorder_safety(self):
-        """Periodic non-intrusive safety check: only acts if taskbar actually occluded Claude."""
+        """Ultra-fast safety check: immediately re-asserts topmost the moment taskbar covers Claude."""
         if self.is_taskbar_above():
             self.assert_topmost()
 
