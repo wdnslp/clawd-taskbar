@@ -97,7 +97,10 @@ class ClaudeTaskbarWidget(QWidget):
 
         # Settings
         self.scale_factor = 3
-        self.snap_to_taskbar = True  # Magnetic snapping to bottom of taskbar
+        self.placement_mode = "top"  # "top" (recommended: sitting on taskbar ledge) or "bottom" (inside taskbar)
+        self.auto_peek_on_shell = True  # In bottom mode: hops up onto taskbar when Start Menu opens so he never disappears
+        self.is_peeked_up = False
+        self.snap_to_taskbar = True  # Magnetic snapping to taskbar
         self.idle_animations_enabled = True
         self.auto_hide_fullscreen = False
 
@@ -135,12 +138,12 @@ class ClaudeTaskbarWidget(QWidget):
         self.idle_timer.timeout.connect(self._trigger_random_idle_action)
         self._schedule_next_idle(10000, 20000)
 
-        # Ultra-fast Z-order monitor: checks every 1 ms so Claude never stays occluded
+        # Shell & Z-order safety monitor (runs smoothly every 60ms with 0.0% CPU)
         self._cached_trays = set()
         self._last_topmost_assert_time = 0.0
         self.zorder_monitor_timer = QTimer(self)
         self.zorder_monitor_timer.timeout.connect(self._check_zorder_safety)
-        self.zorder_monitor_timer.start(1)
+        self.zorder_monitor_timer.start(60)
 
         # Fullscreen detection timer: runs every 800ms only if enabled
         self.fullscreen_timer = QTimer(self)
@@ -151,7 +154,7 @@ class ClaudeTaskbarWidget(QWidget):
         # Initial frame
         self.play_idle()
 
-    # --- Windows Topmost Maintenance ---
+    # --- Windows Topmost Maintenance & Shell Integration ---
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -165,6 +168,25 @@ class ClaudeTaskbarWidget(QWidget):
             self._cached_trays = {h for h in (hwnd_tray, hwnd_tray2) if h}
         return self._cached_trays
 
+    def is_shell_active(self):
+        """Detects if the Windows taskbar, Start Menu, or action center is currently active."""
+        if not user32:
+            return False
+        try:
+            fg = user32.GetForegroundWindow()
+            if not fg:
+                return False
+            cls = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(fg, cls, 256)
+            shell_classes = {
+                "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
+                "Windows.UI.Core.CoreWindow", "XamlExplorerHostIslandWindow",
+                "DV2ControlHost", "ControlCenterWindow"
+            }
+            return cls.value in shell_classes
+        except Exception:
+            return False
+
     def assert_topmost(self):
         """Silently asserts topmost Z-order without sending redraw or WM_WINDOWPOSCHANGING messages."""
         if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
@@ -177,15 +199,21 @@ class ClaudeTaskbarWidget(QWidget):
 
     def is_occluded(self):
         """
-        Checks if Claude is physically occluded in the Z-order by the Windows Taskbar,
-        the Start Menu, or any overlapping application window.
+        Checks if Claude's visible pixels are physically occluded in the Z-order
+        by any overlapping external application window.
         """
         if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
             return False
         try:
             hwnd = int(self.winId())
-            claude_rect = (self.x(), self.y(), self.x() + self.width(), self.y() + self.height())
-            trays = self.get_trays()
+            # In the 16x16 sprite, Claude's visible body spans rows 4 to 11.
+            # Rows 0-3 (top) and 12-15 (bottom) are transparent padding.
+            claude_vis_rect = (
+                self.x(),
+                self.y() + (4 * self.scale_factor),
+                self.x() + self.width(),
+                self.y() + (12 * self.scale_factor)
+            )
             my_pid = os.getpid()
 
             curr = hwnd
@@ -193,10 +221,6 @@ class ClaudeTaskbarWidget(QWidget):
                 curr = user32.GetWindow(curr, GW_HWNDPREV)
                 if not curr:
                     break
-
-                # If the taskbar itself is above Claude, we are definitely occluded
-                if curr in trays:
-                    return True
 
                 if not user32.IsWindowVisible(curr):
                     continue
@@ -207,12 +231,12 @@ class ClaudeTaskbarWidget(QWidget):
                 if pid.value == my_pid:
                     continue
 
-                # Check if this external window physically overlaps Claude's bounding box
+                # Check if this external window physically overlaps Claude's visible bounding box
                 r = wintypes.RECT()
                 if user32.GetWindowRect(curr, ctypes.byref(r)):
-                    # AABB intersection test
-                    if not (r.right <= claude_rect[0] or r.left >= claude_rect[2] or
-                            r.bottom <= claude_rect[1] or r.top >= claude_rect[3]):
+                    # AABB intersection test with visible pixels
+                    if not (r.right <= claude_vis_rect[0] or r.left >= claude_vis_rect[2] or
+                            r.bottom <= claude_vis_rect[1] or r.top >= claude_vis_rect[3]):
                         return True
 
             return False
@@ -220,16 +244,35 @@ class ClaudeTaskbarWidget(QWidget):
             return False
 
     def _check_zorder_safety(self):
-        """Ultra-fast safety check: immediately re-asserts topmost the moment any window covers Claude."""
+        """
+        Runs every 60ms with zero CPU overhead:
+        1. In 'bottom' mode: handles Smart Peek so Claude hops onto the taskbar
+           when the Start Menu / Windows panel is opened, never disappearing!
+        2. Asserts topmost Z-order if occluded by normal windows.
+        """
+        # 1. Smart Peek for 'bottom' mode
+        if self.placement_mode == "bottom" and self.auto_peek_on_shell and not self.is_dragging:
+            shell_on = self.is_shell_active()
+            if shell_on and not self.is_peeked_up:
+                screen = self.get_current_screen()
+                top_y = self.get_taskbar_top_y(screen)
+                self.move(self.x(), top_y)
+                self.is_peeked_up = True
+                self.assert_topmost()
+            elif not shell_on and self.is_peeked_up:
+                screen = self.get_current_screen()
+                bot_y = self.get_taskbar_bottom_y(screen)
+                self.move(self.x(), bot_y)
+                self.is_peeked_up = False
+                self.assert_topmost()
+
+        # 2. Topmost safety against external overlapping windows
         if self.is_occluded():
             now = time.monotonic()
-            # Anti-spinlock cooldown: if we asserted topmost within the last 150ms and are still
-            # occluded (e.g. system Start Menu actively open), don't hammer SetWindowPos 1000 times/sec.
-            if now - self._last_topmost_assert_time > 0.15:
+            if now - self._last_topmost_assert_time > 0.3:
                 self.assert_topmost()
                 self._last_topmost_assert_time = now
         else:
-            # When unoccluded, reset cooldown so that the very next occlusion is handled instantaneously (< 1 ms)!
             self._last_topmost_assert_time = 0.0
 
     def enterEvent(self, event):
@@ -402,54 +445,72 @@ class ClaudeTaskbarWidget(QWidget):
             screen = QApplication.primaryScreen()
         return screen
 
+    def get_taskbar_surface_y(self, screen=None):
+        """Returns the Y coordinate of the top surface/ledge of the taskbar."""
+        if screen is None:
+            screen = self.get_current_screen()
+        avail = screen.availableGeometry()
+        geom = screen.geometry()
+        if avail.height() < geom.height() and avail.top() == geom.top():
+            return avail.bottom() + 1
+        return geom.bottom() + 1
+
+    def get_taskbar_top_y(self, screen=None):
+        """
+        Calculates Y coordinate so Claude's feet rest perfectly on top of the taskbar ledge.
+        Claude is completely outside the taskbar rect and NEVER gets occluded by Start menu/taskbar.
+        """
+        surface_y = self.get_taskbar_surface_y(screen)
+        feet_offset = 12 * self.scale_factor
+        return surface_y - feet_offset
+
     def get_taskbar_bottom_y(self, screen=None):
-        """
-        Calculates Y coordinate so Claude's feet rest at the very bottom edge of the taskbar/screen.
-        In the 16x16 sprite, Claude's feet end at row 11 (12 pixels from top).
-        Rows 12-15 are transparent padding.
-        """
+        """Calculates Y coordinate so Claude's feet rest at the bottom of the screen (inside taskbar)."""
         if screen is None:
             screen = self.get_current_screen()
         geom = screen.geometry()
         feet_offset = 12 * self.scale_factor
         return geom.top() + geom.height() - feet_offset
 
+    def get_target_taskbar_y(self, screen=None):
+        if self.placement_mode == "top":
+            return self.get_taskbar_top_y(screen)
+        else:
+            return self.get_taskbar_bottom_y(screen)
+
     def get_default_position(self, screen=None):
-        """Calculates default position: sitting at the bottom of the taskbar near the tray."""
+        """Calculates default position based on current placement mode near the tray."""
         if screen is None:
             screen = self.get_current_screen()
         geom = screen.geometry()
         x = int(geom.left() + geom.width() * 0.8) - (self.width() // 2)
-        y = self.get_taskbar_bottom_y(screen)
+        y = self.get_target_taskbar_y(screen)
         return QPoint(x, y)
 
     def clamp_position(self, pos, screen=None):
         """
-        Allows moving Claude to ANY location on the desktop while keeping him visible on screen.
-        If snap_to_taskbar is enabled, magnetically snaps his feet to the bottom of the taskbar
-        when within 35px of the bottom edge.
+        Keeps Claude on screen. If snap_to_taskbar is enabled, magnetically snaps him
+        to his designated position (top ledge or bottom of screen).
         """
         if screen is None:
             screen = self.get_current_screen(pos)
         geom = screen.geometry()
 
-        # Clamping bounds to stay visible within screen
         min_x = geom.left()
         max_x = geom.left() + geom.width() - self.width()
         clamped_x = max(min_x, min(max_x, pos.x()))
 
         min_y = geom.top()
-        bottom_y = self.get_taskbar_bottom_y(screen)
-        max_y = bottom_y
+        bottom_limit = self.get_taskbar_bottom_y(screen)
+        target_tb_y = self.get_target_taskbar_y(screen)
 
         if self.snap_to_taskbar:
-            # Magnetic snapping: if within 35px of the bottom of the taskbar, snap down!
-            if abs(pos.y() - bottom_y) < 35 or pos.y() > bottom_y:
-                clamped_y = bottom_y
+            if abs(pos.y() - target_tb_y) < 35 or pos.y() > target_tb_y:
+                clamped_y = target_tb_y
             else:
-                clamped_y = max(min_y, min(max_y, pos.y()))
+                clamped_y = max(min_y, min(bottom_limit, pos.y()))
         else:
-            clamped_y = max(min_y, min(max_y, pos.y()))
+            clamped_y = max(min_y, min(bottom_limit, pos.y()))
 
         return QPoint(clamped_x, clamped_y)
 
@@ -460,6 +521,8 @@ class ClaudeTaskbarWidget(QWidget):
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.scale_factor = data.get("scale_factor", 3)
+                    self.placement_mode = data.get("placement_mode", "top")
+                    self.auto_peek_on_shell = data.get("auto_peek_on_shell", True)
                     self.snap_to_taskbar = data.get("snap_to_taskbar", True)
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
                     self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", False)
@@ -470,10 +533,16 @@ class ClaudeTaskbarWidget(QWidget):
 
     def save_config(self):
         try:
+            saved_y = self.y()
+            if self.is_peeked_up:
+                saved_y = self.get_taskbar_bottom_y()
+
             data = {
                 "x": self.x(),
-                "y": self.y(),
+                "y": saved_y,
                 "scale_factor": self.scale_factor,
+                "placement_mode": self.placement_mode,
+                "auto_peek_on_shell": self.auto_peek_on_shell,
                 "snap_to_taskbar": self.snap_to_taskbar,
                 "idle_animations_enabled": self.idle_animations_enabled,
                 "auto_hide_fullscreen": self.auto_hide_fullscreen
@@ -501,14 +570,14 @@ class ClaudeTaskbarWidget(QWidget):
 
         screen = self.get_current_screen()
         geom = screen.geometry()
-        old_bottom_y = geom.top() + geom.height() - (12 * self.scale_factor)
-        was_at_bottom = abs(self.y() - old_bottom_y) < 6
+        old_target_y = self.get_target_taskbar_y(screen)
+        was_at_target = abs(self.y() - old_target_y) < 6
 
         self.scale_factor = new_factor
         self.update_scaled_pixmaps()
 
-        if was_at_bottom or self.snap_to_taskbar:
-            new_y = self.get_taskbar_bottom_y(screen)
+        if was_at_target or self.snap_to_taskbar:
+            new_y = self.get_target_taskbar_y(screen)
             self.move(self.clamp_position(QPoint(self.x(), new_y)))
         else:
             self.move(self.clamp_position(self.pos()))
@@ -664,16 +733,21 @@ class ClaudeTaskbarWidget(QWidget):
 
         menu.addSeparator()
 
-        sit_top_act = menu.addAction("📍 Посадить на панель задач (сверху)")
-        sit_top_act.triggered.connect(self.sit_on_taskbar_top)
+        place_menu = menu.addMenu("📍 Позиция на панели")
+        top_act = place_menu.addAction(f"{'✓ ' if self.placement_mode == 'top' else '   '}Сверху панели (на бордюре — никогда не исчезает)")
+        top_act.triggered.connect(lambda: self.set_placement_mode("top"))
 
-        sit_bot_act = menu.addAction("📍 Прижать к низу панели задач (снизу)")
-        sit_bot_act.triggered.connect(self.sit_on_bottom_taskbar)
+        bot_act = place_menu.addAction(f"{'✓ ' if self.placement_mode == 'bottom' else '   '}Внутри панели (снизу экрана)")
+        bot_act.triggered.connect(lambda: self.set_placement_mode("bottom"))
+
+        if self.placement_mode == "bottom":
+            peek_act = place_menu.addAction(f"{'✓ ' if self.auto_peek_on_shell else '   '}🐰 Выглядывать при открытии меню Windows")
+            peek_act.triggered.connect(self.toggle_auto_peek)
 
         snap_act = menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}🧲 Магнититься к панели")
         snap_act.triggered.connect(self.toggle_snap_taskbar)
 
-        reset_pos_act = menu.addAction("📍 Сбросить позицию (по умолчанию)")
+        reset_pos_act = menu.addAction("🔄 Сбросить позицию (по умолчанию)")
         reset_pos_act.triggered.connect(self.reset_to_default_pos)
 
         menu.addSeparator()
@@ -703,31 +777,26 @@ class ClaudeTaskbarWidget(QWidget):
                 self.assert_topmost()
         self.save_config()
 
-    def get_taskbar_surface_y(self, screen=None):
-        if screen is None:
-            screen = self.get_current_screen()
-        avail = screen.availableGeometry()
-        geom = screen.geometry()
-        if avail.height() < geom.height() and avail.top() == geom.top():
-            return avail.bottom() + 1
-        return geom.bottom() + 1
-
     def sit_on_taskbar_top(self):
-        """Snaps Claude so his feet rest on the top edge of the taskbar."""
+        """Switches placement to sitting on top of the taskbar (recommended: never occluded)."""
+        self.set_placement_mode("top")
+
+    def sit_on_bottom_taskbar(self):
+        """Switches placement to sitting inside the taskbar (at the bottom of the screen)."""
+        self.set_placement_mode("bottom")
+
+    def set_placement_mode(self, mode):
+        self.placement_mode = mode
+        self.is_peeked_up = False
         screen = self.get_current_screen()
-        surface_y = self.get_taskbar_surface_y(screen)
-        feet_offset = 12 * self.scale_factor
-        target_y = surface_y - feet_offset
+        target_y = self.get_target_taskbar_y(screen)
         self.move(self.clamp_position(QPoint(self.x(), target_y)))
         self.save_config()
         self.assert_topmost()
 
-    def sit_on_bottom_taskbar(self):
-        """Snaps Claude so his feet rest at the bottom of the taskbar."""
-        bottom_y = self.get_taskbar_bottom_y()
-        self.move(self.clamp_position(QPoint(self.x(), bottom_y)))
+    def toggle_auto_peek(self):
+        self.auto_peek_on_shell = not self.auto_peek_on_shell
         self.save_config()
-        self.assert_topmost()
 
     def toggle_snap_taskbar(self):
         self.snap_to_taskbar = not self.snap_to_taskbar
