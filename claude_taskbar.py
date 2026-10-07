@@ -37,7 +37,6 @@ class ClaudeTaskbarWidget(QWidget):
         super().__init__()
 
         # --- Mascot Window Configuration ---
-        # Following open-source desktop mascot standards (VPet, Shimeji, Desktop Waifu):
         # FramelessWindowHint: borderless transparent window
         # WindowStaysOnTopHint: OS-level persistent topmost without Z-order fighting
         # Tool: no taskbar icon, no Alt+Tab entry, desktop accessory style
@@ -53,7 +52,7 @@ class ClaudeTaskbarWidget(QWidget):
 
         # Settings
         self.scale_factor = 3
-        self.snap_to_taskbar = False
+        self.snap_to_taskbar = True  # Magnetic snapping to bottom of taskbar
         self.idle_animations_enabled = True
         self.auto_hide_fullscreen = False
 
@@ -265,33 +264,32 @@ class ClaudeTaskbarWidget(QWidget):
             screen = QApplication.primaryScreen()
         return screen
 
-    def get_taskbar_surface_y(self, screen=None):
-        """Calculates the Y coordinate of the top surface of the taskbar."""
-        if screen is None:
-            screen = self.get_current_screen()
-        avail = screen.availableGeometry()
-        geom = screen.geometry()
-
-        # If taskbar is docked at the bottom of this screen:
-        if avail.height() < geom.height() and avail.top() == geom.top():
-            return avail.bottom() + 1
-        return geom.bottom() + 1
-
-    def get_taskbar_sitting_pos(self, screen=None):
-        """Calculates (x, y) where Claude sits proudly on top of the taskbar."""
+    def get_taskbar_bottom_y(self, screen=None):
+        """
+        Calculates Y coordinate so Claude's feet rest at the very bottom edge of the taskbar/screen.
+        In the 16x16 sprite, Claude's feet end at row 11 (12 pixels from top).
+        Rows 12-15 are transparent padding.
+        """
         if screen is None:
             screen = self.get_current_screen()
         geom = screen.geometry()
         feet_offset = 12 * self.scale_factor
-        surface_y = self.get_taskbar_surface_y(screen)
-        y = surface_y - feet_offset
+        return geom.top() + geom.height() - feet_offset
+
+    def get_default_position(self, screen=None):
+        """Calculates default position: sitting at the bottom of the taskbar near the tray."""
+        if screen is None:
+            screen = self.get_current_screen()
+        geom = screen.geometry()
         x = int(geom.left() + geom.width() * 0.8) - (self.width() // 2)
+        y = self.get_taskbar_bottom_y(screen)
         return QPoint(x, y)
 
     def clamp_position(self, pos, screen=None):
         """
         Allows moving Claude to ANY location on the desktop while keeping him visible on screen.
-        If snap_to_taskbar is enabled, magnetically snaps his feet to the taskbar when dragging close.
+        If snap_to_taskbar is enabled, magnetically snaps his feet to the bottom of the taskbar
+        when within 35px of the bottom edge.
         """
         if screen is None:
             screen = self.get_current_screen(pos)
@@ -303,13 +301,13 @@ class ClaudeTaskbarWidget(QWidget):
         clamped_x = max(min_x, min(max_x, pos.x()))
 
         min_y = geom.top()
-        max_y = geom.top() + geom.height() - self.height()
+        bottom_y = self.get_taskbar_bottom_y(screen)
+        max_y = bottom_y
 
         if self.snap_to_taskbar:
-            feet_offset = 12 * self.scale_factor
-            sitting_y = self.get_taskbar_surface_y(screen) - feet_offset
-            if abs(pos.y() - sitting_y) < 25:
-                clamped_y = sitting_y
+            # Magnetic snapping: if within 35px of the bottom of the taskbar, snap down!
+            if abs(pos.y() - bottom_y) < 35 or pos.y() > bottom_y:
+                clamped_y = bottom_y
             else:
                 clamped_y = max(min_y, min(max_y, pos.y()))
         else:
@@ -324,19 +322,11 @@ class ClaudeTaskbarWidget(QWidget):
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.scale_factor = data.get("scale_factor", 3)
-                    self.snap_to_taskbar = data.get("snap_to_taskbar", False)
+                    self.snap_to_taskbar = data.get("snap_to_taskbar", True)
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
                     self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", False)
                     if "x" in data and "y" in data:
-                        raw_y = data["y"]
-                        screen = QApplication.primaryScreen()
-                        if screen:
-                            surface_y = self.get_taskbar_surface_y(screen)
-                            feet_offset = 12 * self.scale_factor
-                            # Sanitize legacy positions that placed Claude inside Shell_TrayWnd
-                            if raw_y >= surface_y:
-                                raw_y = surface_y - feet_offset
-                        self.saved_pos = QPoint(data["x"], raw_y)
+                        self.saved_pos = QPoint(data["x"], data["y"])
             except Exception as e:
                 print("Failed to load config:", e)
 
@@ -359,7 +349,7 @@ class ClaudeTaskbarWidget(QWidget):
         if self.saved_pos:
             self.move(self.clamp_position(self.saved_pos))
         else:
-            self.move(self.clamp_position(self.get_taskbar_sitting_pos()))
+            self.move(self.clamp_position(self.get_default_position()))
 
     def paintEvent(self, event):
         if self.current_pixmap:
@@ -370,12 +360,20 @@ class ClaudeTaskbarWidget(QWidget):
         new_factor = max(2, min(8, factor))
         if new_factor == self.scale_factor:
             return
-        old_center = self.pos() + QPoint(self.width() // 2, self.height() // 2)
+
+        screen = self.get_current_screen()
+        geom = screen.geometry()
+        old_bottom_y = geom.top() + geom.height() - (12 * self.scale_factor)
+        was_at_bottom = abs(self.y() - old_bottom_y) < 6
+
         self.scale_factor = new_factor
         self.update_scaled_pixmaps()
-        # Keep center point stable during scaling
-        new_top_left = old_center - QPoint(self.width() // 2, self.height() // 2)
-        self.move(self.clamp_position(new_top_left))
+
+        if was_at_bottom or self.snap_to_taskbar:
+            new_y = self.get_taskbar_bottom_y(screen)
+            self.move(self.clamp_position(QPoint(self.x(), new_y)))
+        else:
+            self.move(self.clamp_position(self.pos()))
         self.save_config()
 
     # --- Mouse Events: Free Dragging & Reactions ---
@@ -513,10 +511,10 @@ class ClaudeTaskbarWidget(QWidget):
         scale_menu = menu.addMenu("📐 Размер")
         scale_options = [
             ("Мини (16px, 2x)", 2),
-            ("Компактный (24px, 3x)", 3),
+            ("Половина высоты панели (24px, 3x)", 3),
             ("Средний (32px, 4x)", 4),
             ("Большой (40px, 5x)", 5),
-            ("Крупный (48px, 6x)", 6),
+            ("Вся высота панели (48px, 6x)", 6),
             ("Гигантский (64px, 8x)", 8),
         ]
         for title, factor in scale_options:
@@ -525,10 +523,10 @@ class ClaudeTaskbarWidget(QWidget):
 
         menu.addSeparator()
 
-        sit_act = menu.addAction("📍 Посадить на панель задач")
-        sit_act.triggered.connect(self.sit_on_taskbar)
+        sit_act = menu.addAction("📍 Прижать к низу панели задач")
+        sit_act.triggered.connect(self.sit_on_bottom_taskbar)
 
-        snap_act = menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}🧲 Прилипать к панели при перетаскивании")
+        snap_act = menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}🧲 Магнититься к низу панели")
         snap_act.triggered.connect(self.toggle_snap_taskbar)
 
         reset_pos_act = menu.addAction("📍 Сбросить позицию (по умолчанию)")
@@ -560,21 +558,20 @@ class ClaudeTaskbarWidget(QWidget):
                 self.show()
         self.save_config()
 
-    def sit_on_taskbar(self):
-        """Snaps Claude so his feet rest on top of the taskbar."""
-        screen = self.get_current_screen()
-        surface_y = self.get_taskbar_surface_y(screen)
-        feet_offset = 12 * self.scale_factor
-        target_y = surface_y - feet_offset
-        self.move(self.clamp_position(QPoint(self.x(), target_y)))
+    def sit_on_bottom_taskbar(self):
+        """Snaps Claude so his feet rest at the bottom of the taskbar."""
+        bottom_y = self.get_taskbar_bottom_y()
+        self.move(self.clamp_position(QPoint(self.x(), bottom_y)))
         self.save_config()
 
     def toggle_snap_taskbar(self):
         self.snap_to_taskbar = not self.snap_to_taskbar
+        if self.snap_to_taskbar:
+            self.move(self.clamp_position(self.pos()))
         self.save_config()
 
     def reset_to_default_pos(self):
-        self.move(self.clamp_position(self.get_taskbar_sitting_pos()))
+        self.move(self.clamp_position(self.get_default_position()))
         self.save_config()
 
 
