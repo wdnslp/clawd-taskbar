@@ -19,6 +19,7 @@ ARM_IMAGE_PATH = os.path.join(BASE_DIR, "right-arm-up.png")
 try:
     user32 = ctypes.windll.user32
     kernel32 = ctypes.windll.kernel32
+    shell32 = ctypes.windll.shell32
 
     user32.SetWindowPos.argtypes = [
         wintypes.HWND, wintypes.HWND,
@@ -27,11 +28,26 @@ try:
     ]
     user32.SetWindowPos.restype = wintypes.BOOL
 
-    HWND_TOPMOST = -1
+    user32.IsZoomed.argtypes = [wintypes.HWND]
+    user32.IsZoomed.restype = wintypes.BOOL
+
+    user32.IsWindowVisible.argtypes = [wintypes.HWND]
+    user32.IsWindowVisible.restype = wintypes.BOOL
+
+    user32.IsIconic.argtypes = [wintypes.HWND]
+    user32.IsIconic.restype = wintypes.BOOL
+
+    user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+    user32.GetWindowTextLengthW.restype = ctypes.c_int
+
+    user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    user32.GetClassNameW.restype = ctypes.c_int
+
+    HWND_TOPMOST = wintypes.HWND(-1)
     SWP_NOMOVE = 0x0002
     SWP_NOSIZE = 0x0001
     SWP_NOACTIVATE = 0x0010
-    SWP_FRAMECHANGED = 0x0020
+    SWP_NOOWNERZORDER = 0x0200
     GWL_EXSTYLE = -20
     GWL_STYLE = -16
     WS_EX_TOOLWINDOW = 0x00000080
@@ -41,6 +57,7 @@ try:
 except Exception:
     user32 = None
     kernel32 = None
+    shell32 = None
 
 
 class RECT(ctypes.Structure):
@@ -157,19 +174,18 @@ class ClaudeTaskbarWidget(QWidget):
         self.apply_native_window_styles()
 
     def apply_native_window_styles(self):
-        """Applies WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE, and solidifies HWND_TOPMOST."""
+        """Applies WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE cleanly without frame disruption."""
         if not user32:
             return
         try:
             hwnd = int(self.winId())
             ex = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
             user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
-            # Re-assert topmost with SWP_FRAMECHANGED so the window never drops behind other windows
             user32.SetWindowPos(
                 hwnd,
                 HWND_TOPMOST,
                 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER
             )
         except Exception:
             pass
@@ -183,42 +199,74 @@ class ClaudeTaskbarWidget(QWidget):
             if not fg or fg == int(self.winId()):
                 return False
 
-            if user32.IsIconic(fg):
+            if not user32.IsWindowVisible(fg) or user32.IsIconic(fg):
                 return False
 
-            # Check process name: Windows Shell, Start Menu, Taskbar, and Settings NEVER count as fullscreen
+            # Maximized desktop windows (Chrome, VS Code, Explorer, Terminal) are NOT fullscreen games
+            if user32.IsZoomed(fg):
+                return False
+
+            # Windows without a title are invisible system layers, cursor layers, DWM helpers, or tooltips
+            if user32.GetWindowTextLengthW(fg) < 2:
+                return False
+
+            # Shell and system window classes NEVER count as fullscreen
+            cls_buf = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(fg, cls_buf, 256)
+            cls_name = cls_buf.value.lower()
+            if cls_name in {
+                "progman", "workerw", "shell_traywnd", "shell_secondarytraywnd",
+                "windows.ui.core.corewindow", "startmenuexperiencehost", "searchhost",
+                "shellexperiencehost", "shell_inputswitchtoplevelwindow", "dwm",
+                "tooltips_class32", "taskmgr", "applicationframehost"
+            }:
+                return False
+
+            # Check process name: must be a known, non-system executable
             proc_name = get_process_name(fg)
-            if proc_name in SYSTEM_SHELL_PROCESSES:
+            if not proc_name or proc_name in SYSTEM_SHELL_PROCESSES:
                 return False
 
-            # Check window style: Maximized desktop windows have WS_CAPTION (title bar).
-            # True fullscreen games and videos do NOT have WS_CAPTION.
+            # Check window style: regular windows have WS_CAPTION (title bar)
             style = user32.GetWindowLongW(fg, GWL_STYLE)
             if (style & WS_CAPTION) == WS_CAPTION:
                 return False
 
+            # If Windows says it is accepting notifications, there is definitely no fullscreen game
+            try:
+                if shell32:
+                    state = wintypes.DWORD()
+                    if shell32.SHQueryUserNotificationState(ctypes.byref(state)) == 0:
+                        # 5 = QUNS_ACCEPTS_NOTIFICATIONS, 1 = QUNS_NOT_PRESENT, 7 = QUNS_APP
+                        if state.value in (1, 5, 7):
+                            return False
+            except Exception:
+                pass
+
+            # Check window geometry: must strictly cover the entire monitor
             rect = RECT()
             user32.GetWindowRect(fg, ctypes.byref(rect))
-
             mon_l, mon_t, mon_r, mon_b = mon_rect
-            # Must strictly cover the entire monitor
-            covers = (
+            w = rect.right - rect.left
+            h = rect.bottom - rect.top
+            if w < (mon_r - mon_l) or h < (mon_b - mon_t):
+                return False
+
+            return (
                 rect.left <= mon_l and
                 rect.top <= mon_t and
                 rect.right >= mon_r and
                 rect.bottom >= mon_b
             )
-            return covers
         except Exception:
             return False
 
     def _check_fullscreen(self):
-        """Monitors fullscreen state with 1.2s debounce to completely eliminate false triggers on window opening."""
+        """Monitors fullscreen state with debounce to prevent any flickering during window transitions."""
         if not self.auto_hide_fullscreen:
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
-                self.apply_native_window_styles()
             return
 
         screen = self.get_current_screen()
@@ -234,8 +282,7 @@ class ClaudeTaskbarWidget(QWidget):
 
         if is_full:
             self.fullscreen_consecutive_hits += 1
-            # Require 3 consecutive checks (~1.2 seconds) of true fullscreen before hiding.
-            # This completely guarantees normal window launches, transitions, and splashes NEVER hide Claude!
+            # Require 3 consecutive checks (~1.2 seconds) of true fullscreen before hiding
             if self.fullscreen_consecutive_hits >= 3 and not self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = True
                 self.hide()
@@ -244,7 +291,6 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
-                self.apply_native_window_styles()
 
     def load_all_sprites(self):
         """Loads and organizes all raw 16x16 frames."""
@@ -642,7 +688,6 @@ class ClaudeTaskbarWidget(QWidget):
         if not self.auto_hide_fullscreen and self.hidden_by_fullscreen:
             self.hidden_by_fullscreen = False
             self.show()
-            self.apply_native_window_styles()
         self.save_config()
 
     def reset_to_default_pos(self):
