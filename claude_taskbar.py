@@ -2,6 +2,7 @@ import sys
 import os
 import glob
 import json
+import time
 import random
 import ctypes
 from ctypes import wintypes
@@ -54,6 +55,9 @@ try:
 
     user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+
+    user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+    user32.GetWindowRect.restype = wintypes.BOOL
 
     if shell32:
         shell32.SHQueryUserNotificationState.argtypes = [ctypes.POINTER(wintypes.DWORD)]
@@ -131,10 +135,12 @@ class ClaudeTaskbarWidget(QWidget):
         self.idle_timer.timeout.connect(self._trigger_random_idle_action)
         self._schedule_next_idle(10000, 20000)
 
-        # Stable Z-order monitor: checks every 300ms and asserts topmost without flicker
+        # Ultra-fast Z-order monitor: checks every 1 ms so Claude never stays occluded
+        self._cached_trays = set()
+        self._last_topmost_assert_time = 0.0
         self.zorder_monitor_timer = QTimer(self)
         self.zorder_monitor_timer.timeout.connect(self._check_zorder_safety)
-        self.zorder_monitor_timer.start(300)
+        self.zorder_monitor_timer.start(1)
 
         # Fullscreen detection timer: runs every 800ms only if enabled
         self.fullscreen_timer = QTimer(self)
@@ -151,6 +157,14 @@ class ClaudeTaskbarWidget(QWidget):
         super().showEvent(event)
         self.assert_topmost()
 
+    def get_trays(self):
+        """Returns cached HWNDs for primary and secondary Windows taskbars."""
+        if not self._cached_trays and user32:
+            hwnd_tray = user32.FindWindowW("Shell_TrayWnd", None)
+            hwnd_tray2 = user32.FindWindowW("Shell_SecondaryTrayWnd", None)
+            self._cached_trays = {h for h in (hwnd_tray, hwnd_tray2) if h}
+        return self._cached_trays
+
     def assert_topmost(self):
         """Silently asserts topmost Z-order without sending redraw or WM_WINDOWPOSCHANGING messages."""
         if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
@@ -162,30 +176,61 @@ class ClaudeTaskbarWidget(QWidget):
             pass
 
     def is_occluded(self):
-        """Checks if the Windows Taskbar has occluded Claude in the Z-order."""
-        if not user32:
+        """
+        Checks if Claude is physically occluded in the Z-order by the Windows Taskbar,
+        the Start Menu, or any overlapping application window.
+        """
+        if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
             return False
         try:
             hwnd = int(self.winId())
-            hwnd_tray = user32.FindWindowW("Shell_TrayWnd", None)
-            if not hwnd_tray:
-                return False
+            claude_rect = (self.x(), self.y(), self.x() + self.width(), self.y() + self.height())
+            trays = self.get_trays()
+            my_pid = os.getpid()
 
             curr = hwnd
-            for _ in range(25):
+            for _ in range(50):
                 curr = user32.GetWindow(curr, GW_HWNDPREV)
                 if not curr:
                     break
-                if curr == hwnd_tray:
+
+                # If the taskbar itself is above Claude, we are definitely occluded
+                if curr in trays:
                     return True
+
+                if not user32.IsWindowVisible(curr):
+                    continue
+
+                # Ignore our own windows (context menus, tooltips, etc.)
+                pid = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(curr, ctypes.byref(pid))
+                if pid.value == my_pid:
+                    continue
+
+                # Check if this external window physically overlaps Claude's bounding box
+                r = wintypes.RECT()
+                if user32.GetWindowRect(curr, ctypes.byref(r)):
+                    # AABB intersection test
+                    if not (r.right <= claude_rect[0] or r.left >= claude_rect[2] or
+                            r.bottom <= claude_rect[1] or r.top >= claude_rect[3]):
+                        return True
+
             return False
         except Exception:
             return False
 
     def _check_zorder_safety(self):
-        """Safety check: re-asserts topmost whenever the taskbar occludes Claude."""
+        """Ultra-fast safety check: immediately re-asserts topmost the moment any window covers Claude."""
         if self.is_occluded():
-            self.assert_topmost()
+            now = time.monotonic()
+            # Anti-spinlock cooldown: if we asserted topmost within the last 150ms and are still
+            # occluded (e.g. system Start Menu actively open), don't hammer SetWindowPos 1000 times/sec.
+            if now - self._last_topmost_assert_time > 0.15:
+                self.assert_topmost()
+                self._last_topmost_assert_time = now
+        else:
+            # When unoccluded, reset cooldown so that the very next occlusion is handled instantaneously (< 1 ms)!
+            self._last_topmost_assert_time = 0.0
 
     def enterEvent(self, event):
         """Hovering over Claude ensures he is always at the top of the stack for clicks/drag."""
