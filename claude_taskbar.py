@@ -18,6 +18,8 @@ ARM_IMAGE_PATH = os.path.join(BASE_DIR, "right-arm-up.png")
 # Win32 API Definitions
 try:
     user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+
     user32.SetWindowPos.argtypes = [
         wintypes.HWND, wintypes.HWND,
         ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
@@ -25,20 +27,20 @@ try:
     ]
     user32.SetWindowPos.restype = wintypes.BOOL
 
-    SetWindowLongPtrW = getattr(user32, "SetWindowLongPtrW", user32.SetWindowLongW)
-    SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
-    SetWindowLongPtrW.restype = ctypes.c_void_p
-
     HWND_TOPMOST = -1
     SWP_NOMOVE = 0x0002
     SWP_NOSIZE = 0x0001
     SWP_NOACTIVATE = 0x0010
     SWP_NOOWNERZORDER = 0x0200
-    GWLP_HWNDPARENT = -8
     GWL_EXSTYLE = -20
+    GWL_STYLE = -16
     WS_EX_TOOLWINDOW = 0x00000080
+    WS_EX_NOACTIVATE = 0x08000000
+    WS_CAPTION = 0x00C00000
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 except Exception:
     user32 = None
+    kernel32 = None
 
 
 class RECT(ctypes.Structure):
@@ -50,13 +52,50 @@ class RECT(ctypes.Structure):
     ]
 
 
+SYSTEM_SHELL_PROCESSES = {
+    "explorer.exe",
+    "startmenuexperiencehost.exe",
+    "searchhost.exe",
+    "shellexperiencehost.exe",
+    "textinputhost.exe",
+    "systemsettings.exe",
+    "taskmgr.exe",
+    "lockapp.exe",
+    "applicationframehost.exe",
+    "dwm.exe",
+    "ctfmon.exe",
+}
+
+
+def get_process_name(hwnd):
+    """Retrieves executable name of the window's owner process."""
+    if not user32 or not kernel32:
+        return ""
+    try:
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return ""
+        h_proc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+        if not h_proc:
+            return ""
+        buf = ctypes.create_unicode_buffer(1024)
+        size = wintypes.DWORD(1024)
+        res = kernel32.QueryFullProcessImageNameW(h_proc, 0, buf, ctypes.byref(size))
+        kernel32.CloseHandle(h_proc)
+        if res:
+            return os.path.basename(buf.value).lower()
+    except Exception:
+        pass
+    return ""
+
+
 class ClaudeTaskbarWidget(QWidget):
     def __init__(self):
         super().__init__()
 
         # Use FramelessWindowHint and WindowStaysOnTopHint.
-        # DO NOT use Qt.WindowType.Tool, as Qt adds CS_SAVEBITS which causes
-        # Windows to restore desktop bits and make Claude blink or vanish when opening windows/Start Menu!
+        # DO NOT use Qt.WindowType.Tool (it injects CS_SAVEBITS which causes DWM redraw flashes).
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint
@@ -77,7 +116,10 @@ class ClaudeTaskbarWidget(QWidget):
         self.drag_start_pos = None
         self.window_start_pos = None
         self.is_dragging = False
+
+        # Fullscreen detection state
         self.hidden_by_fullscreen = False
+        self.fullscreen_consecutive_hits = 0
 
         # Load all sprites and animations
         self.load_all_sprites()
@@ -100,10 +142,10 @@ class ClaudeTaskbarWidget(QWidget):
         self.idle_timer.timeout.connect(self._trigger_random_idle_action)
         self._schedule_next_idle(10000, 20000)
 
-        # Fullscreen detection and topmost management timer (runs smoothly every 200ms)
-        self.monitor_timer = QTimer(self)
-        self.monitor_timer.timeout.connect(self._monitor_fullscreen_and_state)
-        self.monitor_timer.start(200)
+        # Fullscreen detection timer: runs every 300ms smoothly with debounce
+        self.fullscreen_timer = QTimer(self)
+        self.fullscreen_timer.timeout.connect(self._check_fullscreen)
+        self.fullscreen_timer.start(300)
 
         # Initial frame
         self.play_idle()
@@ -113,32 +155,18 @@ class ClaudeTaskbarWidget(QWidget):
         self.apply_native_window_styles()
 
     def apply_native_window_styles(self):
-        """Configures native Windows styles: hides from taskbar/Alt-Tab without CS_SAVEBITS, and attaches to taskbar."""
+        """Applies WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE to prevent taskbar presence and focus stealing."""
         if not user32:
             return
         try:
             hwnd = int(self.winId())
-            # 1. Add WS_EX_TOOLWINDOW so Claude is not visible in Taskbar / Alt-Tab
             ex = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TOOLWINDOW)
-
-            # 2. Set owner to Shell_TrayWnd so Claude stays above the Taskbar even when Start menu is open
-            hwnd_tray = user32.FindWindowW("Shell_TrayWnd", None)
-            if hwnd_tray:
-                SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, hwnd_tray)
-
-            # 3. Ensure topmost cleanly without SWP_SHOWWINDOW (no blinking/flicker)
-            user32.SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER
-            )
+            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
         except Exception:
             pass
 
     def is_foreground_fullscreen(self, mon_rect):
-        """Checks if the active foreground window is in fullscreen covering the monitor."""
+        """Checks if a genuine fullscreen application (game, F11, video) is covering the screen."""
         if not user32:
             return False
         try:
@@ -146,33 +174,27 @@ class ClaudeTaskbarWidget(QWidget):
             if not fg:
                 return False
 
-            # If foreground window is Claude itself, not fullscreen
             if fg == int(self.winId()):
                 return False
 
-            # If window is minimized, not fullscreen
             if user32.IsIconic(fg):
                 return False
 
-            cls_buf = ctypes.create_unicode_buffer(256)
-            user32.GetClassNameW(fg, cls_buf, 256)
-            cls_name = cls_buf.value
+            # Check process name: Windows Shell, Start Menu, Taskbar, and Settings NEVER count as fullscreen
+            proc_name = get_process_name(fg)
+            if proc_name in SYSTEM_SHELL_PROCESSES:
+                return False
 
-            # Ignore desktop and shell elements
-            ignore_classes = {
-                "Progman", "WorkerW",
-                "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
-                "Windows.UI.Core.CoreWindow", "StartMenuExperienceHost",
-                "SearchHost", "Shell_InputSwitchTopLevelWindow"
-            }
-            if cls_name in ignore_classes:
+            # Check window style: Maximized desktop windows have WS_CAPTION (title bar).
+            # True fullscreen games and videos do NOT have WS_CAPTION.
+            style = user32.GetWindowLongW(fg, GWL_STYLE)
+            if (style & WS_CAPTION) == WS_CAPTION:
                 return False
 
             rect = RECT()
             user32.GetWindowRect(fg, ctypes.byref(rect))
 
             mon_l, mon_t, mon_r, mon_b = mon_rect
-            # Fullscreen covers the whole monitor including taskbar
             covers = (
                 rect.left <= mon_l and
                 rect.top <= mon_t and
@@ -183,8 +205,8 @@ class ClaudeTaskbarWidget(QWidget):
         except Exception:
             return False
 
-    def _monitor_fullscreen_and_state(self):
-        """Handles auto-hiding during fullscreen apps, and maintains clean Z-order."""
+    def _check_fullscreen(self):
+        """Monitors fullscreen state with debounce to prevent any flickering during window opening."""
         screen = self.get_current_screen()
         geom = screen.geometry()
         mon_rect = (
@@ -194,30 +216,21 @@ class ClaudeTaskbarWidget(QWidget):
             geom.top() + geom.height()
         )
 
-        fullscreen_active = self.is_foreground_fullscreen(mon_rect)
+        is_full = self.is_foreground_fullscreen(mon_rect)
 
-        if fullscreen_active:
-            if not self.hidden_by_fullscreen:
+        if is_full:
+            self.fullscreen_consecutive_hits += 1
+            # Require 2 consecutive checks (~600ms) of true fullscreen before hiding
+            # This completely filters out transient window launch/maximize animations!
+            if self.fullscreen_consecutive_hits >= 2 and not self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = True
                 self.hide()
         else:
+            self.fullscreen_consecutive_hits = 0
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
                 self.apply_native_window_styles()
-            else:
-                # Maintain gentle topmost without SWP_SHOWWINDOW (no blinking)
-                if user32 and self.isVisible():
-                    try:
-                        hwnd = int(self.winId())
-                        user32.SetWindowPos(
-                            hwnd,
-                            HWND_TOPMOST,
-                            0, 0, 0, 0,
-                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER
-                        )
-                    except Exception:
-                        pass
 
     def load_all_sprites(self):
         """Loads and organizes all raw 16x16 frames."""
@@ -268,7 +281,6 @@ class ClaudeTaskbarWidget(QWidget):
         self.setFixedSize(w, h)
 
         if self.isVisible():
-            # Keep feet pinned to ground level and clamp strictly inside screen
             new_y = old_ground_y - (12 * self.scale_factor)
             clamped = self.clamp_position(QPoint(self.x(), new_y))
             self.move(clamped)
@@ -396,12 +408,10 @@ class ClaudeTaskbarWidget(QWidget):
             screen = self.get_current_screen(pos)
         geom = screen.geometry()
 
-        # Horizontal bounds: prevent going off-screen to the left or right
         min_x = geom.left()
         max_x = geom.left() + geom.width() - self.width()
         clamped_x = max(min_x, min(max_x, pos.x()))
 
-        # Ground level is row 11 (the bottom of Claude's feet), so 12 units from top
         ground_offset = 12 * self.scale_factor
         ground_bottom_y = geom.top() + geom.height() - ground_offset
 
@@ -539,7 +549,6 @@ class ClaudeTaskbarWidget(QWidget):
             }
         """)
 
-        # Animations submenu
         anim_menu = menu.addMenu("🎭 Анимации")
         anim_list = [
             ("👋 Помахать рукой (Wave)", "wave", 110, False),
@@ -566,11 +575,9 @@ class ClaudeTaskbarWidget(QWidget):
 
         menu.addSeparator()
 
-        # Idle mode toggle
         idle_act = menu.addAction(f"{'✓ ' if self.idle_animations_enabled else '   '}Живой режим (авто-анимации)")
         idle_act.triggered.connect(self.toggle_idle_mode)
 
-        # Scale submenu
         scale_menu = menu.addMenu("📐 Размер")
         scale_options = [
             ("Половина высоты панели (24px, 3x)", 3),
