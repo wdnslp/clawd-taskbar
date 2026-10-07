@@ -49,6 +49,12 @@ try:
     user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
     user32.FindWindowW.restype = wintypes.HWND
 
+    user32.IsWindowVisible.argtypes = [wintypes.HWND]
+    user32.IsWindowVisible.restype = wintypes.BOOL
+
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+
     if shell32:
         shell32.SHQueryUserNotificationState.argtypes = [ctypes.POINTER(wintypes.DWORD)]
         shell32.SHQueryUserNotificationState.restype = ctypes.c_long
@@ -144,32 +150,7 @@ class ClaudeTaskbarWidget(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.setup_taskbar_ownership()
-
-    def get_trays(self):
-        if not self._cached_trays and user32:
-            hwnd_tray = user32.FindWindowW("Shell_TrayWnd", None)
-            hwnd_tray2 = user32.FindWindowW("Shell_SecondaryTrayWnd", None)
-            self._cached_trays = {h for h in (hwnd_tray, hwnd_tray2) if h}
-        return self._cached_trays
-
-    def setup_taskbar_ownership(self):
-        """
-        Sets Shell_TrayWnd as the Win32 OWNER of Claude's top-level window.
-        Under Windows User32 rules: an owned window is ALWAYS rendered above its owner.
-        When Shell_TrayWnd is activated, Windows automatically keeps Claude on top of it.
-        """
-        if not user32 or not SetWindowLongPtr:
-            return
-        try:
-            hwnd = int(self.winId())
-            trays = self.get_trays()
-            tray_hwnd = next(iter(trays)) if trays else None
-            if tray_hwnd:
-                SetWindowLongPtr(hwnd, GWLP_HWNDPARENT, tray_hwnd)
-            self.assert_topmost()
-        except Exception as e:
-            print("Failed to set taskbar ownership:", e)
+        self.assert_topmost()
 
     def assert_topmost(self):
         """Silently asserts topmost Z-order without sending redraw or WM_WINDOWPOSCHANGING messages."""
@@ -181,30 +162,32 @@ class ClaudeTaskbarWidget(QWidget):
         except Exception:
             pass
 
-    def is_taskbar_above(self):
-        """Checks if the Windows Taskbar has occluded Claude in the Z-order."""
+    def is_occluded(self):
+        """Checks if any visible window from an external process (Taskbar, Start Menu, etc.) is currently above Claude in Z-order."""
         if not user32:
             return False
         try:
             hwnd = int(self.winId())
-            trays = self.get_trays()
-            if not trays:
+            prev = user32.GetWindow(hwnd, GW_HWNDPREV)
+            if not prev:
                 return False
 
-            curr = hwnd
-            for _ in range(25):
-                curr = user32.GetWindow(curr, GW_HWNDPREV)
-                if not curr:
-                    break
-                if curr in trays:
-                    return True
-            return False
+            if not user32.IsWindowVisible(prev):
+                return False
+
+            # Ignore windows belonging to our own process (such as QMenu context menu)
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(prev, ctypes.byref(pid))
+            if pid.value == os.getpid():
+                return False
+
+            return True
         except Exception:
             return False
 
     def _check_zorder_safety(self):
-        """Ultra-fast safety check: immediately re-asserts topmost the moment taskbar covers Claude."""
-        if self.is_taskbar_above():
+        """Ultra-fast safety check: immediately re-asserts topmost the moment taskbar or Windows panel covers Claude."""
+        if self.is_occluded():
             self.assert_topmost()
 
     def enterEvent(self, event):
