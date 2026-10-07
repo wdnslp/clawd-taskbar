@@ -68,11 +68,16 @@ try:
     user32.UnhookWinEvent.argtypes = [wintypes.HANDLE]
     user32.UnhookWinEvent.restype = wintypes.BOOL
 
+    user32.GetWindow.argtypes = [wintypes.HWND, ctypes.c_uint]
+    user32.GetWindow.restype = wintypes.HWND
+
+    GW_HWNDPREV = 3
     HWND_TOPMOST = wintypes.HWND(-1)
     SWP_NOMOVE = 0x0002
     SWP_NOSIZE = 0x0001
     SWP_NOACTIVATE = 0x0010
     SWP_NOOWNERZORDER = 0x0200
+    SWP_NOCOPYBITS = 0x0100
     GWL_EXSTYLE = -20
     GWL_STYLE = -16
     WS_EX_TOOLWINDOW = 0x00000080
@@ -195,10 +200,10 @@ class ClaudeTaskbarWidget(QWidget):
         self.fullscreen_timer.timeout.connect(self._check_fullscreen)
         self.fullscreen_timer.start(400)
 
-        # Continuous Z-order maintenance timer (keeps Claude strictly above Shell_TrayWnd taskbar at all times)
+        # Periodic Z-order check (runs smoothly every 200ms, only updates if taskbar took precedence)
         self.zorder_timer = QTimer(self)
-        self.zorder_timer.timeout.connect(self.maintain_zorder)
-        self.zorder_timer.start(150)
+        self.zorder_timer.timeout.connect(lambda: self.maintain_zorder(force=False))
+        self.zorder_timer.start(200)
 
         # Hook Windows EVENT_SYSTEM_FOREGROUND so the instant any window opens, Claude stays on top
         self._init_winevent_hook()
@@ -207,13 +212,13 @@ class ClaudeTaskbarWidget(QWidget):
         self.play_idle()
 
     def _init_winevent_hook(self):
-        """Hooks Windows foreground change events to guarantee 0ms latency topmost retention."""
+        """Hooks Windows foreground change events to guarantee Claude stays on top when windows activate."""
         if not user32:
             return
         try:
             def win_event_callback(hHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime):
                 if hwnd and hwnd != int(self.winId()):
-                    self.maintain_zorder()
+                    self.maintain_zorder(force=False)
 
             self._win_event_callback_ref = WINEVENTPROC(win_event_callback)
             self._hook = user32.SetWinEventHook(
@@ -238,18 +243,42 @@ class ClaudeTaskbarWidget(QWidget):
         super().showEvent(event)
         self.apply_native_window_styles()
 
-    def maintain_zorder(self):
-        """Maintains Claude strictly on top of the taskbar (Shell_TrayWnd) in the topmost Z-band."""
+    def is_taskbar_above(self):
+        """Checks if the Windows Taskbar is currently above Claude in the Z-order."""
+        if not user32:
+            return False
+        try:
+            hwnd = int(self.winId())
+            hwnd_tray = user32.FindWindowW("Shell_TrayWnd", None)
+            hwnd_tray2 = user32.FindWindowW("Shell_SecondaryTrayWnd", None)
+            trays = {h for h in (hwnd_tray, hwnd_tray2) if h}
+            if not trays:
+                return False
+
+            curr = hwnd
+            for _ in range(50):
+                curr = user32.GetWindow(curr, GW_HWNDPREV)
+                if not curr:
+                    break
+                if curr in trays:
+                    return True
+            return False
+        except Exception:
+            return False
+
+    def maintain_zorder(self, force=False):
+        """Maintains Claude strictly on top of the taskbar (Shell_TrayWnd) only when needed to prevent any flicker."""
         if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
             return
         try:
-            hwnd = int(self.winId())
-            user32.SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER
-            )
+            if force or self.is_taskbar_above():
+                hwnd = int(self.winId())
+                user32.SetWindowPos(
+                    hwnd,
+                    HWND_TOPMOST,
+                    0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOCOPYBITS
+                )
         except Exception:
             pass
 
@@ -263,7 +292,7 @@ class ClaudeTaskbarWidget(QWidget):
             user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
             # Notify Windows Shell that this window does not suppress the taskbar
             user32.SetPropW(hwnd, "NonRudeHWND", 1)
-            self.maintain_zorder()
+            self.maintain_zorder(force=True)
         except Exception:
             pass
 
@@ -348,7 +377,7 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
-                self.maintain_zorder()
+                self.maintain_zorder(force=True)
             return
 
         screen = self.get_current_screen()
@@ -373,7 +402,7 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
-                self.maintain_zorder()
+                self.maintain_zorder(force=True)
 
     def load_all_sprites(self):
         """Loads and organizes all raw 16x16 frames."""
