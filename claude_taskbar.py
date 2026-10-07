@@ -31,7 +31,7 @@ try:
     SWP_NOMOVE = 0x0002
     SWP_NOSIZE = 0x0001
     SWP_NOACTIVATE = 0x0010
-    SWP_NOOWNERZORDER = 0x0200
+    SWP_FRAMECHANGED = 0x0020
     GWL_EXSTYLE = -20
     GWL_STYLE = -16
     WS_EX_TOOLWINDOW = 0x00000080
@@ -64,6 +64,8 @@ SYSTEM_SHELL_PROCESSES = {
     "applicationframehost.exe",
     "dwm.exe",
     "ctfmon.exe",
+    "nvidia overlay.exe",
+    "nvcontainer.exe",
 }
 
 
@@ -94,8 +96,7 @@ class ClaudeTaskbarWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        # Use FramelessWindowHint and WindowStaysOnTopHint.
-        # DO NOT use Qt.WindowType.Tool (it injects CS_SAVEBITS which causes DWM redraw flashes).
+        # Frameless, Always on Top, transparent window
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint
@@ -107,6 +108,7 @@ class ClaudeTaskbarWidget(QWidget):
         self.scale_factor = 3  # 3x scale: Claude body is 24px tall (50% of 48px taskbar)
         self.snap_to_bottom = True
         self.idle_animations_enabled = True
+        self.auto_hide_fullscreen = True
 
         # State
         self.current_anim_name = "idle"
@@ -142,10 +144,10 @@ class ClaudeTaskbarWidget(QWidget):
         self.idle_timer.timeout.connect(self._trigger_random_idle_action)
         self._schedule_next_idle(10000, 20000)
 
-        # Fullscreen detection timer: runs every 300ms smoothly with debounce
+        # Fullscreen detection timer: runs every 400ms smoothly with 3-tick debounce (1.2s)
         self.fullscreen_timer = QTimer(self)
         self.fullscreen_timer.timeout.connect(self._check_fullscreen)
-        self.fullscreen_timer.start(300)
+        self.fullscreen_timer.start(400)
 
         # Initial frame
         self.play_idle()
@@ -155,26 +157,30 @@ class ClaudeTaskbarWidget(QWidget):
         self.apply_native_window_styles()
 
     def apply_native_window_styles(self):
-        """Applies WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE to prevent taskbar presence and focus stealing."""
+        """Applies WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE, and solidifies HWND_TOPMOST."""
         if not user32:
             return
         try:
             hwnd = int(self.winId())
             ex = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
             user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
+            # Re-assert topmost with SWP_FRAMECHANGED so the window never drops behind other windows
+            user32.SetWindowPos(
+                hwnd,
+                HWND_TOPMOST,
+                0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED
+            )
         except Exception:
             pass
 
     def is_foreground_fullscreen(self, mon_rect):
         """Checks if a genuine fullscreen application (game, F11, video) is covering the screen."""
-        if not user32:
+        if not user32 or not self.auto_hide_fullscreen:
             return False
         try:
             fg = user32.GetForegroundWindow()
-            if not fg:
-                return False
-
-            if fg == int(self.winId()):
+            if not fg or fg == int(self.winId()):
                 return False
 
             if user32.IsIconic(fg):
@@ -195,6 +201,7 @@ class ClaudeTaskbarWidget(QWidget):
             user32.GetWindowRect(fg, ctypes.byref(rect))
 
             mon_l, mon_t, mon_r, mon_b = mon_rect
+            # Must strictly cover the entire monitor
             covers = (
                 rect.left <= mon_l and
                 rect.top <= mon_t and
@@ -206,7 +213,14 @@ class ClaudeTaskbarWidget(QWidget):
             return False
 
     def _check_fullscreen(self):
-        """Monitors fullscreen state with debounce to prevent any flickering during window opening."""
+        """Monitors fullscreen state with 1.2s debounce to completely eliminate false triggers on window opening."""
+        if not self.auto_hide_fullscreen:
+            if self.hidden_by_fullscreen:
+                self.hidden_by_fullscreen = False
+                self.show()
+                self.apply_native_window_styles()
+            return
+
         screen = self.get_current_screen()
         geom = screen.geometry()
         mon_rect = (
@@ -220,9 +234,9 @@ class ClaudeTaskbarWidget(QWidget):
 
         if is_full:
             self.fullscreen_consecutive_hits += 1
-            # Require 2 consecutive checks (~600ms) of true fullscreen before hiding
-            # This completely filters out transient window launch/maximize animations!
-            if self.fullscreen_consecutive_hits >= 2 and not self.hidden_by_fullscreen:
+            # Require 3 consecutive checks (~1.2 seconds) of true fullscreen before hiding.
+            # This completely guarantees normal window launches, transitions, and splashes NEVER hide Claude!
+            if self.fullscreen_consecutive_hits >= 3 and not self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = True
                 self.hide()
         else:
@@ -433,6 +447,7 @@ class ClaudeTaskbarWidget(QWidget):
                     self.scale_factor = data.get("scale_factor", 3)
                     self.snap_to_bottom = data.get("snap_to_bottom", True)
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
+                    self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", True)
                     if "x" in data and "y" in data:
                         self.saved_pos = QPoint(data["x"], data["y"])
             except Exception as e:
@@ -445,7 +460,8 @@ class ClaudeTaskbarWidget(QWidget):
                 "y": self.y(),
                 "scale_factor": self.scale_factor,
                 "snap_to_bottom": self.snap_to_bottom,
-                "idle_animations_enabled": self.idle_animations_enabled
+                "idle_animations_enabled": self.idle_animations_enabled,
+                "auto_hide_fullscreen": self.auto_hide_fullscreen
             }
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -549,6 +565,7 @@ class ClaudeTaskbarWidget(QWidget):
             }
         """)
 
+        # Animations submenu
         anim_menu = menu.addMenu("🎭 Анимации")
         anim_list = [
             ("👋 Помахать рукой (Wave)", "wave", 110, False),
@@ -575,9 +592,15 @@ class ClaudeTaskbarWidget(QWidget):
 
         menu.addSeparator()
 
+        # Idle mode toggle
         idle_act = menu.addAction(f"{'✓ ' if self.idle_animations_enabled else '   '}Живой режим (авто-анимации)")
         idle_act.triggered.connect(self.toggle_idle_mode)
 
+        # Fullscreen auto-hide toggle
+        fs_act = menu.addAction(f"{'✓ ' if self.auto_hide_fullscreen else '   '}Скрывать в полноэкранных играх/видео")
+        fs_act.triggered.connect(self.toggle_fullscreen_mode)
+
+        # Scale submenu
         scale_menu = menu.addMenu("📐 Размер")
         scale_options = [
             ("Половина высоты панели (24px, 3x)", 3),
@@ -612,6 +635,14 @@ class ClaudeTaskbarWidget(QWidget):
             self._schedule_next_idle(5000, 15000)
         else:
             self.idle_timer.stop()
+        self.save_config()
+
+    def toggle_fullscreen_mode(self):
+        self.auto_hide_fullscreen = not self.auto_hide_fullscreen
+        if not self.auto_hide_fullscreen and self.hidden_by_fullscreen:
+            self.hidden_by_fullscreen = False
+            self.show()
+            self.apply_native_window_styles()
         self.save_config()
 
     def reset_to_default_pos(self):
