@@ -23,13 +23,48 @@ ANIM_DIR = os.path.join(BASE_DIR, "animations")
 BASE_IMAGE_PATH = os.path.join(BASE_DIR, "base.png")
 ARM_IMAGE_PATH = os.path.join(BASE_DIR, "right-arm-up.png")
 
-# Win32 Shell API for non-intrusive fullscreen game detection (SHQueryUserNotificationState)
+# Win32 APIs for taskbar ownership & non-flickering topmost assertion
 try:
+    user32 = ctypes.windll.user32
     shell32 = ctypes.windll.shell32
-    shell32.SHQueryUserNotificationState.argtypes = [ctypes.POINTER(wintypes.DWORD)]
-    shell32.SHQueryUserNotificationState.restype = ctypes.c_long
+
+    if hasattr(user32, "SetWindowLongPtrW"):
+        SetWindowLongPtr = user32.SetWindowLongPtrW
+    else:
+        SetWindowLongPtr = user32.SetWindowLongW
+
+    SetWindowLongPtr.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LPARAM]
+    SetWindowLongPtr.restype = wintypes.LPARAM
+
+    user32.SetWindowPos.argtypes = [
+        wintypes.HWND, wintypes.HWND,
+        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ctypes.c_uint
+    ]
+    user32.SetWindowPos.restype = wintypes.BOOL
+
+    user32.GetWindow.argtypes = [wintypes.HWND, ctypes.c_uint]
+    user32.GetWindow.restype = wintypes.HWND
+
+    user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+    user32.FindWindowW.restype = wintypes.HWND
+
+    if shell32:
+        shell32.SHQueryUserNotificationState.argtypes = [ctypes.POINTER(wintypes.DWORD)]
+        shell32.SHQueryUserNotificationState.restype = ctypes.c_long
+
+    GWLP_HWNDPARENT = -8
+    GW_HWNDPREV = 3
+    HWND_TOPMOST = wintypes.HWND(-1)
+
+    # 0x071B: SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOCOPYBITS | SWP_NOSENDCHANGING | SWP_NOREDRAW
+    # This flags combination instructs Windows to adjust Z-order without sending WM_WINDOWPOSCHANGING,
+    # without performing internal BitBlt screen copying, and without triggering redraws.
+    SWP_FLAGS_SILENT = 0x0002 | 0x0001 | 0x0010 | 0x0200 | 0x0100 | 0x0400 | 0x0008
 except Exception:
+    user32 = None
     shell32 = None
+    SetWindowLongPtr = None
 
 
 class ClaudeTaskbarWidget(QWidget):
@@ -37,9 +72,8 @@ class ClaudeTaskbarWidget(QWidget):
         super().__init__()
 
         # --- Mascot Window Configuration ---
-        # Following open-source desktop mascot standards (VPet, Shimeji, Desktop Waifu):
         # FramelessWindowHint: borderless transparent window
-        # WindowStaysOnTopHint: OS-level persistent topmost without Z-order fighting
+        # WindowStaysOnTopHint: OS-level persistent topmost
         # Tool: no taskbar icon, no Alt+Tab entry, desktop accessory style
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -53,7 +87,7 @@ class ClaudeTaskbarWidget(QWidget):
 
         # Settings
         self.scale_factor = 3
-        self.snap_to_taskbar = True
+        self.snap_to_taskbar = True  # Magnetic snapping to bottom of taskbar
         self.idle_animations_enabled = True
         self.auto_hide_fullscreen = False
 
@@ -91,6 +125,11 @@ class ClaudeTaskbarWidget(QWidget):
         self.idle_timer.timeout.connect(self._trigger_random_idle_action)
         self._schedule_next_idle(10000, 20000)
 
+        # Gentle Z-order monitor: checks once a second only if taskbar actually occluded Claude
+        self.zorder_monitor_timer = QTimer(self)
+        self.zorder_monitor_timer.timeout.connect(self._check_zorder_safety)
+        self.zorder_monitor_timer.start(1000)
+
         # Fullscreen detection timer: runs every 800ms only if enabled
         self.fullscreen_timer = QTimer(self)
         self.fullscreen_timer.timeout.connect(self._check_fullscreen)
@@ -99,6 +138,72 @@ class ClaudeTaskbarWidget(QWidget):
 
         # Initial frame
         self.play_idle()
+
+    # --- Windows Shell Ownership & Topmost Maintenance ---
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.setup_taskbar_ownership()
+
+    def setup_taskbar_ownership(self):
+        """
+        Sets Shell_TrayWnd as the Win32 OWNER of Claude's top-level window.
+        Under Windows User32 rules: an owned window is ALWAYS rendered above its owner.
+        When Shell_TrayWnd is activated, Windows automatically keeps Claude on top of it.
+        """
+        if not user32 or not SetWindowLongPtr:
+            return
+        try:
+            hwnd = int(self.winId())
+            tray_hwnd = user32.FindWindowW("Shell_TrayWnd", None)
+            if tray_hwnd:
+                SetWindowLongPtr(hwnd, GWLP_HWNDPARENT, tray_hwnd)
+            self.assert_topmost()
+        except Exception as e:
+            print("Failed to set taskbar ownership:", e)
+
+    def assert_topmost(self):
+        """Silently asserts topmost Z-order without sending redraw or WM_WINDOWPOSCHANGING messages."""
+        if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
+            return
+        try:
+            hwnd = int(self.winId())
+            user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FLAGS_SILENT)
+        except Exception:
+            pass
+
+    def is_taskbar_above(self):
+        """Checks if the Windows Taskbar has occluded Claude in the Z-order."""
+        if not user32:
+            return False
+        try:
+            hwnd = int(self.winId())
+            hwnd_tray = user32.FindWindowW("Shell_TrayWnd", None)
+            hwnd_tray2 = user32.FindWindowW("Shell_SecondaryTrayWnd", None)
+            trays = {h for h in (hwnd_tray, hwnd_tray2) if h}
+            if not trays:
+                return False
+
+            curr = hwnd
+            for _ in range(30):
+                curr = user32.GetWindow(curr, GW_HWNDPREV)
+                if not curr:
+                    break
+                if curr in trays:
+                    return True
+            return False
+        except Exception:
+            return False
+
+    def _check_zorder_safety(self):
+        """Periodic non-intrusive safety check: only acts if taskbar actually occluded Claude."""
+        if self.is_taskbar_above():
+            self.assert_topmost()
+
+    def enterEvent(self, event):
+        """Hovering over Claude ensures he is always at the top of the stack for clicks/drag."""
+        super().enterEvent(event)
+        self.assert_topmost()
 
     # --- Sprite & Animation Loading ---
 
@@ -265,33 +370,32 @@ class ClaudeTaskbarWidget(QWidget):
             screen = QApplication.primaryScreen()
         return screen
 
-    def get_taskbar_surface_y(self, screen=None):
-        """Calculates the Y coordinate of the top surface of the taskbar."""
-        if screen is None:
-            screen = self.get_current_screen()
-        avail = screen.availableGeometry()
-        geom = screen.geometry()
-
-        # If taskbar is docked at the bottom of this screen:
-        if avail.height() < geom.height() and avail.top() == geom.top():
-            return avail.bottom() + 1
-        return geom.bottom() + 1
-
-    def get_taskbar_sitting_pos(self, screen=None):
-        """Calculates (x, y) where Claude sits proudly on top of the taskbar."""
+    def get_taskbar_bottom_y(self, screen=None):
+        """
+        Calculates Y coordinate so Claude's feet rest at the very bottom edge of the taskbar/screen.
+        In the 16x16 sprite, Claude's feet end at row 11 (12 pixels from top).
+        Rows 12-15 are transparent padding.
+        """
         if screen is None:
             screen = self.get_current_screen()
         geom = screen.geometry()
         feet_offset = 12 * self.scale_factor
-        surface_y = self.get_taskbar_surface_y(screen)
-        y = surface_y - feet_offset
+        return geom.top() + geom.height() - feet_offset
+
+    def get_default_position(self, screen=None):
+        """Calculates default position: sitting at the bottom of the taskbar near the tray."""
+        if screen is None:
+            screen = self.get_current_screen()
+        geom = screen.geometry()
         x = int(geom.left() + geom.width() * 0.8) - (self.width() // 2)
+        y = self.get_taskbar_bottom_y(screen)
         return QPoint(x, y)
 
     def clamp_position(self, pos, screen=None):
         """
         Allows moving Claude to ANY location on the desktop while keeping him visible on screen.
-        If snap_to_taskbar is enabled, magnetically snaps his feet to the taskbar when dragging close.
+        If snap_to_taskbar is enabled, magnetically snaps his feet to the bottom of the taskbar
+        when within 35px of the bottom edge.
         """
         if screen is None:
             screen = self.get_current_screen(pos)
@@ -303,13 +407,13 @@ class ClaudeTaskbarWidget(QWidget):
         clamped_x = max(min_x, min(max_x, pos.x()))
 
         min_y = geom.top()
-        max_y = geom.top() + geom.height() - self.height()
+        bottom_y = self.get_taskbar_bottom_y(screen)
+        max_y = bottom_y
 
         if self.snap_to_taskbar:
-            feet_offset = 12 * self.scale_factor
-            sitting_y = self.get_taskbar_surface_y(screen) - feet_offset
-            if abs(pos.y() - sitting_y) < 25:
-                clamped_y = sitting_y
+            # Magnetic snapping: if within 35px of the bottom of the taskbar, snap down!
+            if abs(pos.y() - bottom_y) < 35 or pos.y() > bottom_y:
+                clamped_y = bottom_y
             else:
                 clamped_y = max(min_y, min(max_y, pos.y()))
         else:
@@ -328,15 +432,7 @@ class ClaudeTaskbarWidget(QWidget):
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
                     self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", False)
                     if "x" in data and "y" in data:
-                        raw_y = data["y"]
-                        screen = QApplication.primaryScreen()
-                        if screen:
-                            surface_y = self.get_taskbar_surface_y(screen)
-                            feet_offset = 12 * self.scale_factor
-                            # Sanitize legacy positions that placed Claude inside Shell_TrayWnd
-                            if raw_y >= surface_y:
-                                raw_y = surface_y - feet_offset
-                        self.saved_pos = QPoint(data["x"], raw_y)
+                        self.saved_pos = QPoint(data["x"], data["y"])
             except Exception as e:
                 print("Failed to load config:", e)
 
@@ -359,7 +455,7 @@ class ClaudeTaskbarWidget(QWidget):
         if self.saved_pos:
             self.move(self.clamp_position(self.saved_pos))
         else:
-            self.move(self.clamp_position(self.get_taskbar_sitting_pos()))
+            self.move(self.clamp_position(self.get_default_position()))
 
     def paintEvent(self, event):
         if self.current_pixmap:
@@ -372,15 +468,16 @@ class ClaudeTaskbarWidget(QWidget):
             return
 
         screen = self.get_current_screen()
-        old_surface_y = self.get_taskbar_surface_y(screen)
-        was_on_taskbar = abs(self.y() - (old_surface_y - 12 * self.scale_factor)) < 6
+        geom = screen.geometry()
+        old_bottom_y = geom.top() + geom.height() - (12 * self.scale_factor)
+        was_at_bottom = abs(self.y() - old_bottom_y) < 6
 
         self.scale_factor = new_factor
         self.update_scaled_pixmaps()
 
-        if was_on_taskbar or self.snap_to_taskbar:
-            new_sitting_y = self.get_taskbar_surface_y(screen) - (12 * self.scale_factor)
-            self.move(self.clamp_position(QPoint(self.x(), new_sitting_y)))
+        if was_at_bottom or self.snap_to_taskbar:
+            new_y = self.get_taskbar_bottom_y(screen)
+            self.move(self.clamp_position(QPoint(self.x(), new_y)))
         else:
             self.move(self.clamp_position(self.pos()))
         self.save_config()
@@ -406,6 +503,7 @@ class ClaudeTaskbarWidget(QWidget):
             if self.is_dragging:
                 self.move(self.clamp_position(self.pos()))
                 self.save_config()
+                self.assert_topmost()
                 self.play_idle()
             else:
                 self.trigger_click_reaction()
@@ -431,6 +529,7 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
+                self.assert_topmost()
             return
 
         if not shell32:
@@ -449,6 +548,7 @@ class ClaudeTaskbarWidget(QWidget):
                 elif not is_game and self.hidden_by_fullscreen:
                     self.hidden_by_fullscreen = False
                     self.show()
+                    self.assert_topmost()
         except Exception:
             pass
 
@@ -520,10 +620,10 @@ class ClaudeTaskbarWidget(QWidget):
         scale_menu = menu.addMenu("📐 Размер")
         scale_options = [
             ("Мини (16px, 2x)", 2),
-            ("Компактный (24px, 3x)", 3),
+            ("Половина высоты панели (24px, 3x)", 3),
             ("Средний (32px, 4x)", 4),
             ("Большой (40px, 5x)", 5),
-            ("Крупный (48px, 6x)", 6),
+            ("Вся высота панели (48px, 6x)", 6),
             ("Гигантский (64px, 8x)", 8),
         ]
         for title, factor in scale_options:
@@ -532,10 +632,10 @@ class ClaudeTaskbarWidget(QWidget):
 
         menu.addSeparator()
 
-        sit_act = menu.addAction("📍 Посадить на панель задач")
-        sit_act.triggered.connect(self.sit_on_taskbar)
+        sit_act = menu.addAction("📍 Прижать к низу панели задач")
+        sit_act.triggered.connect(self.sit_on_bottom_taskbar)
 
-        snap_act = menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}🧲 Прилипать к панели при перетаскивании")
+        snap_act = menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}🧲 Магнититься к низу панели")
         snap_act.triggered.connect(self.toggle_snap_taskbar)
 
         reset_pos_act = menu.addAction("📍 Сбросить позицию (по умолчанию)")
@@ -565,24 +665,26 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
+                self.assert_topmost()
         self.save_config()
 
-    def sit_on_taskbar(self):
-        """Snaps Claude so his feet rest on top of the taskbar."""
-        screen = self.get_current_screen()
-        surface_y = self.get_taskbar_surface_y(screen)
-        feet_offset = 12 * self.scale_factor
-        target_y = surface_y - feet_offset
-        self.move(self.clamp_position(QPoint(self.x(), target_y)))
+    def sit_on_bottom_taskbar(self):
+        """Snaps Claude so his feet rest at the bottom of the taskbar."""
+        bottom_y = self.get_taskbar_bottom_y()
+        self.move(self.clamp_position(QPoint(self.x(), bottom_y)))
         self.save_config()
+        self.assert_topmost()
 
     def toggle_snap_taskbar(self):
         self.snap_to_taskbar = not self.snap_to_taskbar
+        if self.snap_to_taskbar:
+            self.move(self.clamp_position(self.pos()))
         self.save_config()
 
     def reset_to_default_pos(self):
-        self.move(self.clamp_position(self.get_taskbar_sitting_pos()))
+        self.move(self.clamp_position(self.get_default_position()))
         self.save_config()
+        self.assert_topmost()
 
 
 def main():
