@@ -63,6 +63,21 @@ try:
     user32.SetWindowRgn.argtypes = [wintypes.HWND, wintypes.HRGN, wintypes.BOOL]
     user32.SetWindowRgn.restype = ctypes.c_int
 
+    user32.SetParent.argtypes = [wintypes.HWND, wintypes.HWND]
+    user32.SetParent.restype = wintypes.HWND
+
+    user32.GetParent.argtypes = [wintypes.HWND]
+    user32.GetParent.restype = wintypes.HWND
+
+    user32.GetAncestor.argtypes = [wintypes.HWND, ctypes.c_uint]
+    user32.GetAncestor.restype = wintypes.HWND
+
+    user32.BringWindowToTop.argtypes = [wintypes.HWND]
+    user32.BringWindowToTop.restype = wintypes.BOOL
+
+    user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetWindowLongW.restype = ctypes.c_long
+
     user32.GetDC.argtypes = [wintypes.HWND]
     user32.GetDC.restype = wintypes.HDC
 
@@ -94,11 +109,18 @@ try:
     # This flags combination instructs Windows to adjust Z-order without sending WM_WINDOWPOSCHANGING,
     # without performing internal BitBlt screen copying, and without triggering redraws.
     SWP_FLAGS_SILENT = 0x0002 | 0x0001 | 0x0010 | 0x0200 | 0x0100 | 0x0400 | 0x0008
+
+    def to_lparam(val):
+        if val >= (1 << 31):
+            return val - (1 << 32)
+        return val
 except Exception:
     user32 = None
     gdi32 = None
     shell32 = None
     SetWindowLongPtr = None
+    def to_lparam(val):
+        return val
 
 
 class ClaudeTaskbarWidget(QWidget):
@@ -138,9 +160,9 @@ class ClaudeTaskbarWidget(QWidget):
         self.is_dragging = False
         self.on_anim_finished = None
 
-        # Fullscreen & Taskbar Hole integration state
+        # Fullscreen & Taskbar Embedding state
         self.hidden_by_fullscreen = False
-        self._tray_hole_active = False
+        self._is_embedded = False
 
         # Load all sprites and animations
         self.load_all_sprites()
@@ -179,81 +201,114 @@ class ClaudeTaskbarWidget(QWidget):
         # Initial frame
         self.play_idle()
 
-    # --- Windows Topmost Maintenance & Shell Integration ---
+    # --- Windows Taskbar Embedding & Topmost Maintenance ---
 
-    def update_taskbar_hole(self):
-        """
-        In 'bottom' mode (inside taskbar), carves a precise region hole in Shell_TrayWnd
-        tightly around Claude's actual visible body. This preserves the top surface and
-        border of the taskbar (eliminating any black boxes above Claude) while ensuring
-        DWM never occludes Claude when Start Menu or Windows panels are open.
-        """
-        if not user32 or not gdi32:
-            return
-
-        tray = user32.FindWindowW("Shell_TrayWnd", None)
-        if not tray:
-            return
-
-        if self.placement_mode != "bottom" or not self.isVisible() or self.hidden_by_fullscreen:
-            if self._tray_hole_active:
-                user32.SetWindowRgn(tray, None, True)
-                self._tray_hole_active = False
-            return
-
+    def get_tray_rect(self):
+        """Returns the screen RECT of Shell_TrayWnd."""
+        if not user32:
+            return None
         try:
+            tray = user32.FindWindowW("Shell_TrayWnd", None)
+            if not tray:
+                return None
             r = wintypes.RECT()
-            if not user32.GetWindowRect(tray, ctypes.byref(r)):
-                return
-            tray_w = r.right - r.left
-            tray_h = r.bottom - r.top
-
-            scale = self.scale_factor
-            local_x = self.x() - r.left
-            local_y = self.y() - r.top
-
-            # Carve tightly around Claude's body only (keeping top of taskbar 100% intact)
-            x1 = max(0, local_x + (2 * scale))
-            x2 = min(tray_w, local_x + (14 * scale))
-            y1 = max(0, local_y + (3 * scale))
-            y2 = tray_h
-
-            if x2 <= x1 or y2 <= y1 or x1 >= tray_w or y1 >= tray_h:
-                if self._tray_hole_active:
-                    user32.SetWindowRgn(tray, None, True)
-                    self._tray_hole_active = False
-                return
-
-            r_full = gdi32.CreateRectRgn(0, 0, tray_w, tray_h)
-            r_hole = gdi32.CreateRectRgn(x1, y1, x2, y2)
-            r_diff = gdi32.CreateRectRgn(0, 0, 0, 0)
-            gdi32.CombineRgn(r_diff, r_full, r_hole, 4)  # RGN_DIFF = 4
-
-            user32.SetWindowRgn(tray, r_diff, True)
-            gdi32.DeleteObject(r_full)
-            gdi32.DeleteObject(r_hole)
-            self._tray_hole_active = True
+            if user32.GetWindowRect(tray, ctypes.byref(r)):
+                return r
         except Exception:
             pass
+        return None
+
+    def embed_in_taskbar(self):
+        """
+        Embeds Claude's window as a genuine WS_CHILD of Shell_TrayWnd.
+        This seamlessly places Claude inside the taskbar:
+        - Claude is rendered as part of the taskbar's visual hierarchy by DWM.
+        - Claude NEVER disappears when Start Menu, Action Center, or Windows panels open.
+        - NO hole is carved in the taskbar, so the taskbar's native acrylic background
+          is preserved behind Claude with zero black boxes or black borders.
+        """
+        if not user32:
+            return
+        try:
+            tray = user32.FindWindowW("Shell_TrayWnd", None)
+            if not tray:
+                return
+            hwnd = int(self.winId())
+            if not hwnd:
+                return
+
+            # Make sure tray has normal region (no leftover holes)
+            user32.SetWindowRgn(tray, None, True)
+
+            user32.SetParent(hwnd, tray)
+            style = user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE
+            # Remove WS_POPUP (0x80000000), add WS_CHILD (0x40000000) and WS_VISIBLE (0x10000000)
+            new_style = (style & ~0x80000000) | 0x40000000 | 0x10000000
+            SetWindowLongPtr(hwnd, -16, to_lparam(new_style))
+            self._is_embedded = True
+
+            tray_r = self.get_tray_rect()
+            if tray_r:
+                tray_w = tray_r.right - tray_r.left
+                tray_h = tray_r.bottom - tray_r.top
+                target_y = tray_h - (12 * self.scale_factor)
+                if self.saved_pos:
+                    local_x = max(0, min(tray_w - self.width(), self.saved_pos.x() - tray_r.left))
+                else:
+                    local_x = int(tray_w * 0.8) - (self.width() // 2)
+                user32.SetWindowPos(hwnd, 0, local_x, target_y, self.width(), self.height(), 0x0040)
+                user32.BringWindowToTop(hwnd)
+        except Exception as e:
+            print("embed_in_taskbar error:", e)
+
+    def unembed_from_taskbar(self):
+        """
+        Restores Claude as a top-level topmost window when in 'top' placement mode
+        (sitting on top of the taskbar ledge).
+        """
+        if not user32 or not self._is_embedded:
+            return
+        try:
+            hwnd = int(self.winId())
+            if not hwnd:
+                return
+
+            tray_r = self.get_tray_rect()
+            screen_x = (tray_r.left if tray_r else 0) + self.x()
+            screen = self.get_current_screen()
+            screen_y = self.get_taskbar_top_y(screen)
+
+            user32.SetParent(hwnd, 0)
+            style = user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE
+            # Remove WS_CHILD (0x40000000), restore WS_POPUP (0x80000000) | WS_VISIBLE
+            top_style = (style & ~0x40000000) | 0x80000000 | 0x10000000
+            SetWindowLongPtr(hwnd, -16, to_lparam(top_style))
+            self._is_embedded = False
+
+            user32.SetWindowPos(hwnd, HWND_TOPMOST, screen_x, screen_y, self.width(), self.height(), 0x0040)
+            self.move(screen_x, screen_y)
+            self.attach_tray_ownership()
+            self.assert_topmost()
+        except Exception as e:
+            print("unembed_from_taskbar error:", e)
 
     def restore_taskbar_hole(self):
-        """Restores the Windows taskbar region to normal (removes the hole)."""
+        """Ensures the Windows taskbar region is normal (no hole)."""
         if not user32:
             return
         try:
             tray = user32.FindWindowW("Shell_TrayWnd", None)
             if tray:
                 user32.SetWindowRgn(tray, None, True)
-            self._tray_hole_active = False
         except Exception:
             pass
 
     def attach_tray_ownership(self):
         """
-        Sets the Windows taskbar (Shell_TrayWnd) as the owner of Claude's window.
-        In Windows DWM, an owned window inherits the owner's Z-order band.
+        Sets the Windows taskbar (Shell_TrayWnd) as the owner of Claude's window
+        when running as a top-level window.
         """
-        if not user32 or not SetWindowLongPtr or not self.isVisible() or self.hidden_by_fullscreen:
+        if not user32 or not SetWindowLongPtr or not self.isVisible() or self.hidden_by_fullscreen or self._is_embedded:
             return
         try:
             hwnd = int(self.winId())
@@ -273,18 +328,21 @@ class ClaudeTaskbarWidget(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.update_taskbar_hole()
-        self.attach_tray_ownership()
-        self.assert_topmost()
+        if self.placement_mode == "bottom":
+            if not self._is_embedded:
+                self.embed_in_taskbar()
+        else:
+            self.attach_tray_ownership()
+            self.assert_topmost()
 
     def closeEvent(self, event):
+        if self._is_embedded:
+            self.unembed_from_taskbar()
         self.restore_taskbar_hole()
         super().closeEvent(event)
 
     def moveEvent(self, event):
         super().moveEvent(event)
-        if self.placement_mode == "bottom" and not self.is_dragging:
-            self.update_taskbar_hole()
 
     def get_trays(self):
         """Returns cached HWNDs for primary and secondary Windows taskbars."""
@@ -315,7 +373,7 @@ class ClaudeTaskbarWidget(QWidget):
 
     def assert_topmost(self):
         """Silently asserts topmost Z-order and taskbar ownership without redrawing."""
-        if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
+        if not user32 or not self.isVisible() or self.hidden_by_fullscreen or self._is_embedded:
             return
         try:
             self.attach_tray_ownership()
@@ -327,14 +385,12 @@ class ClaudeTaskbarWidget(QWidget):
     def is_occluded(self):
         """
         Checks if Claude's visible pixels are physically occluded in the Z-order
-        by any overlapping external application window.
+        by any overlapping external application window (only relevant in top mode).
         """
-        if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
+        if not user32 or not self.isVisible() or self.hidden_by_fullscreen or self._is_embedded:
             return False
         try:
             hwnd = int(self.winId())
-            # In the 16x16 sprite, Claude's visible body spans rows 4 to 11.
-            # Rows 0-3 (top) and 12-15 (bottom) are transparent padding.
             claude_vis_rect = (
                 self.x(),
                 self.y() + (4 * self.scale_factor),
@@ -352,16 +408,13 @@ class ClaudeTaskbarWidget(QWidget):
                 if not user32.IsWindowVisible(curr):
                     continue
 
-                # Ignore our own windows (context menus, tooltips, etc.)
                 pid = wintypes.DWORD()
                 user32.GetWindowThreadProcessId(curr, ctypes.byref(pid))
                 if pid.value == my_pid:
                     continue
 
-                # Check if this external window physically overlaps Claude's visible bounding box
                 r = wintypes.RECT()
                 if user32.GetWindowRect(curr, ctypes.byref(r)):
-                    # AABB intersection test with visible pixels
                     if not (r.right <= claude_vis_rect[0] or r.left >= claude_vis_rect[2] or
                             r.bottom <= claude_vis_rect[1] or r.top >= claude_vis_rect[3]):
                         return True
@@ -373,13 +426,28 @@ class ClaudeTaskbarWidget(QWidget):
     def _check_zorder_safety(self):
         """
         Runs smoothly every 60ms with zero CPU overhead:
-        1. Maintains Shell_TrayWnd ownership so Claude NEVER disappears behind taskbar
-           even when Start Menu, Action Center, or Windows panels are open.
-        2. Asserts topmost Z-order if occluded by normal windows.
+        1. When embedded in taskbar ('bottom' mode): maintains WS_CHILD hierarchy inside Shell_TrayWnd
+           so Claude is rendered by DWM directly as part of the taskbar and never occluded by Windows panels.
+        2. When top-level ('top' mode): maintains Shell_TrayWnd ownership and asserts topmost Z-order.
         """
         if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
             return
 
+        if self.placement_mode == "bottom" and self._is_embedded:
+            try:
+                hwnd = int(self.winId())
+                tray = user32.FindWindowW("Shell_TrayWnd", None)
+                if tray:
+                    parent = user32.GetAncestor(hwnd, 1)  # GA_PARENT = 1
+                    if parent != tray:
+                        self.embed_in_taskbar()
+                    else:
+                        user32.BringWindowToTop(hwnd)
+            except Exception:
+                pass
+            return
+
+        # Top mode handling
         try:
             hwnd = int(self.winId())
             tray = user32.FindWindowW("Shell_TrayWnd", None)
@@ -391,23 +459,7 @@ class ClaudeTaskbarWidget(QWidget):
         except Exception:
             pass
 
-        # 1. Smart Peek (optional fallback if user enables it)
-        if self.placement_mode == "bottom" and self.auto_peek_on_shell and not self.is_dragging:
-            shell_on = self.is_shell_active()
-            if shell_on and not self.is_peeked_up:
-                screen = self.get_current_screen()
-                top_y = self.get_taskbar_top_y(screen)
-                self.move(self.x(), top_y)
-                self.is_peeked_up = True
-                self.assert_topmost()
-            elif not shell_on and self.is_peeked_up:
-                screen = self.get_current_screen()
-                bot_y = self.get_taskbar_bottom_y(screen)
-                self.move(self.x(), bot_y)
-                self.is_peeked_up = False
-                self.assert_topmost()
-
-        # 2. Topmost safety against external overlapping windows
+        # Topmost safety against external overlapping windows
         if self.is_occluded():
             now = time.monotonic()
             if now - self._last_topmost_assert_time > 0.3:
@@ -419,7 +471,12 @@ class ClaudeTaskbarWidget(QWidget):
     def enterEvent(self, event):
         """Hovering over Claude ensures he is always at the top of the stack for clicks/drag."""
         super().enterEvent(event)
-        self.assert_topmost()
+        if self.placement_mode == "bottom" and self._is_embedded:
+            hwnd = int(self.winId())
+            if user32 and hwnd:
+                user32.BringWindowToTop(hwnd)
+        else:
+            self.assert_topmost()
 
     # --- Sprite & Animation Loading ---
 
@@ -617,10 +674,22 @@ class ClaudeTaskbarWidget(QWidget):
         if self.placement_mode == "top":
             return self.get_taskbar_top_y(screen)
         else:
-            return self.get_taskbar_bottom_y(screen)
+            if self._is_embedded:
+                tray_r = self.get_tray_rect()
+                tray_h = (tray_r.bottom - tray_r.top) if tray_r else 48
+                return tray_h - (12 * self.scale_factor)
+            else:
+                return self.get_taskbar_bottom_y(screen)
 
     def get_default_position(self, screen=None):
         """Calculates default position based on current placement mode near the tray."""
+        if self.placement_mode == "bottom" and self._is_embedded:
+            tray_r = self.get_tray_rect()
+            tray_w = (tray_r.right - tray_r.left) if tray_r else 1920
+            tray_h = (tray_r.bottom - tray_r.top) if tray_r else 48
+            x = int(tray_w * 0.8) - (self.width() // 2)
+            y = tray_h - (12 * self.scale_factor)
+            return QPoint(x, y)
         if screen is None:
             screen = self.get_current_screen()
         geom = screen.geometry()
@@ -630,9 +699,25 @@ class ClaudeTaskbarWidget(QWidget):
 
     def clamp_position(self, pos, screen=None):
         """
-        Keeps Claude on screen. If snap_to_taskbar is enabled, magnetically snaps him
-        to his designated position (top ledge or bottom of screen).
+        Keeps Claude on screen or within taskbar. If snap_to_taskbar is enabled,
+        magnetically snaps him to his designated position.
         """
+        if self.placement_mode == "bottom" and self._is_embedded:
+            tray_r = self.get_tray_rect()
+            tray_w = (tray_r.right - tray_r.left) if tray_r else 1920
+            tray_h = (tray_r.bottom - tray_r.top) if tray_r else 48
+
+            min_x = 0
+            max_x = tray_w - self.width()
+            clamped_x = max(min_x, min(max_x, pos.x()))
+
+            target_y = tray_h - (12 * self.scale_factor)
+            if self.snap_to_taskbar:
+                clamped_y = target_y
+            else:
+                clamped_y = max(0, min(tray_h - self.height(), pos.y()))
+            return QPoint(clamped_x, clamped_y)
+
         if screen is None:
             screen = self.get_current_screen(pos)
         geom = screen.geometry()
@@ -674,13 +759,29 @@ class ClaudeTaskbarWidget(QWidget):
 
     def save_config(self):
         try:
-            saved_y = self.y()
-            if self.is_peeked_up:
-                saved_y = self.get_taskbar_bottom_y()
+            if self.placement_mode == "bottom" and self._is_embedded:
+                tray_r = self.get_tray_rect()
+                hwnd = int(self.winId()) if user32 else None
+                if hwnd and user32:
+                    wr = wintypes.RECT()
+                    if user32.GetWindowRect(hwnd, ctypes.byref(wr)):
+                        screen_x = wr.left
+                        screen_y = wr.top
+                    else:
+                        screen_x = self.saved_pos.x() if self.saved_pos else 1451
+                        screen_y = (tray_r.top if tray_r else 1032) + 12
+                else:
+                    screen_x = self.saved_pos.x() if self.saved_pos else 1451
+                    screen_y = (tray_r.top if tray_r else 1032) + 12
+            else:
+                screen_x = self.x()
+                screen_y = self.y()
+                if self.is_peeked_up:
+                    screen_y = self.get_taskbar_bottom_y()
 
             data = {
-                "x": self.x(),
-                "y": saved_y,
+                "x": screen_x,
+                "y": screen_y,
                 "scale_factor": self.scale_factor,
                 "placement_mode": self.placement_mode,
                 "auto_peek_on_shell": self.auto_peek_on_shell,
@@ -694,10 +795,13 @@ class ClaudeTaskbarWidget(QWidget):
             print("Failed to save config:", e)
 
     def ensure_valid_position(self):
-        if self.saved_pos:
-            self.move(self.clamp_position(self.saved_pos))
+        if self.placement_mode == "bottom":
+            return
         else:
-            self.move(self.clamp_position(self.get_default_position()))
+            if self.saved_pos:
+                self.move(self.clamp_position(self.saved_pos))
+            else:
+                self.move(self.clamp_position(self.get_default_position()))
 
     def paintEvent(self, event):
         if self.current_pixmap:
@@ -709,20 +813,27 @@ class ClaudeTaskbarWidget(QWidget):
         if new_factor == self.scale_factor:
             return
 
-        screen = self.get_current_screen()
-        geom = screen.geometry()
-        old_target_y = self.get_target_taskbar_y(screen)
-        was_at_target = abs(self.y() - old_target_y) < 6
-
         self.scale_factor = new_factor
         self.update_scaled_pixmaps()
 
-        if was_at_target or self.snap_to_taskbar:
+        if self.placement_mode == "bottom" and self._is_embedded:
+            tray_r = self.get_tray_rect()
+            if tray_r:
+                tray_w = tray_r.right - tray_r.left
+                tray_h = tray_r.bottom - tray_r.top
+                target_y = tray_h - (12 * self.scale_factor)
+                hwnd = int(self.winId())
+                if user32 and hwnd:
+                    wr = wintypes.RECT()
+                    user32.GetWindowRect(hwnd, ctypes.byref(wr))
+                    local_x = max(0, min(tray_w - self.width(), wr.left - tray_r.left))
+                    user32.SetWindowPos(hwnd, 0, local_x, target_y, self.width(), self.height(), 0x0040)
+        else:
+            screen = self.get_current_screen()
             new_y = self.get_target_taskbar_y(screen)
             self.move(self.clamp_position(QPoint(self.x(), new_y)))
-        else:
-            self.move(self.clamp_position(self.pos()))
-        self.update_taskbar_hole()
+            self.assert_topmost()
+
         self.save_config()
 
     # --- Mouse Events: Free Dragging & Reactions ---
@@ -730,7 +841,13 @@ class ClaudeTaskbarWidget(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_start_pos = event.globalPosition().toPoint()
-            self.window_start_pos = self.pos()
+            if self.placement_mode == "bottom" and self._is_embedded and user32:
+                hwnd = int(self.winId())
+                wr = wintypes.RECT()
+                user32.GetWindowRect(hwnd, ctypes.byref(wr))
+                self.window_start_screen_x = wr.left
+            else:
+                self.window_start_pos = self.pos()
             self.is_dragging = False
 
     def mouseMoveEvent(self, event):
@@ -738,16 +855,31 @@ class ClaudeTaskbarWidget(QWidget):
             delta = event.globalPosition().toPoint() - self.drag_start_pos
             if delta.manhattanLength() > 3:
                 self.is_dragging = True
-                target_pos = self.window_start_pos + delta
-                self.move(self.clamp_position(target_pos))
+                if self.placement_mode == "bottom" and self._is_embedded and user32:
+                    tray_r = self.get_tray_rect()
+                    if tray_r:
+                        tray_w = tray_r.right - tray_r.left
+                        tray_h = tray_r.bottom - tray_r.top
+                        target_screen_x = self.window_start_screen_x + delta.x()
+                        local_x = max(0, min(tray_w - self.width(), target_screen_x - tray_r.left))
+                        target_y = tray_h - (12 * self.scale_factor)
+                        hwnd = int(self.winId())
+                        user32.SetWindowPos(hwnd, 0, local_x, target_y, self.width(), self.height(), 0x0040)
+                else:
+                    target_pos = self.window_start_pos + delta
+                    self.move(self.clamp_position(target_pos))
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             if self.is_dragging:
-                self.move(self.clamp_position(self.pos()))
-                self.update_taskbar_hole()
+                if self.placement_mode == "bottom" and self._is_embedded:
+                    hwnd = int(self.winId())
+                    if user32 and hwnd:
+                        user32.BringWindowToTop(hwnd)
+                else:
+                    self.move(self.clamp_position(self.pos()))
+                    self.assert_topmost()
                 self.save_config()
-                self.assert_topmost()
                 self.play_idle()
             else:
                 self.trigger_click_reaction()
@@ -773,7 +905,11 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
-                self.assert_topmost()
+                if self.placement_mode == "bottom":
+                    if not self._is_embedded:
+                        self.embed_in_taskbar()
+                else:
+                    self.assert_topmost()
             return
 
         if not shell32:
@@ -788,13 +924,15 @@ class ClaudeTaskbarWidget(QWidget):
                 is_game = state.value in (2, 3)
                 if is_game and not self.hidden_by_fullscreen:
                     self.hidden_by_fullscreen = True
-                    self.restore_taskbar_hole()
                     self.hide()
                 elif not is_game and self.hidden_by_fullscreen:
                     self.hidden_by_fullscreen = False
                     self.show()
-                    self.update_taskbar_hole()
-                    self.assert_topmost()
+                    if self.placement_mode == "bottom":
+                        if not self._is_embedded:
+                            self.embed_in_taskbar()
+                    else:
+                        self.assert_topmost()
         except Exception:
             pass
 
@@ -915,8 +1053,11 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
-                self.update_taskbar_hole()
-                self.assert_topmost()
+                if self.placement_mode == "bottom":
+                    if not self._is_embedded:
+                        self.embed_in_taskbar()
+                else:
+                    self.assert_topmost()
         self.save_config()
 
     def sit_on_taskbar_top(self):
@@ -928,17 +1069,17 @@ class ClaudeTaskbarWidget(QWidget):
         self.set_placement_mode("bottom")
 
     def set_placement_mode(self, mode):
+        if self.placement_mode == mode:
+            return
         self.placement_mode = mode
         self.is_peeked_up = False
-        screen = self.get_current_screen()
-        target_y = self.get_target_taskbar_y(screen)
-        self.move(self.clamp_position(QPoint(self.x(), target_y)))
+
         if mode == "bottom":
-            self.update_taskbar_hole()
+            self.embed_in_taskbar()
         else:
-            self.restore_taskbar_hole()
+            self.unembed_from_taskbar()
+
         self.save_config()
-        self.assert_topmost()
 
     def toggle_auto_peek(self):
         self.auto_peek_on_shell = not self.auto_peek_on_shell
@@ -951,9 +1092,20 @@ class ClaudeTaskbarWidget(QWidget):
         self.save_config()
 
     def reset_to_default_pos(self):
-        self.move(self.clamp_position(self.get_default_position()))
+        if self.placement_mode == "bottom" and self._is_embedded:
+            tray_r = self.get_tray_rect()
+            tray_w = (tray_r.right - tray_r.left) if tray_r else 1920
+            tray_h = (tray_r.bottom - tray_r.top) if tray_r else 48
+            local_x = int(tray_w * 0.8) - (self.width() // 2)
+            local_y = tray_h - (12 * self.scale_factor)
+            self.move(local_x, local_y)
+            hwnd = int(self.winId())
+            if user32 and hwnd:
+                user32.SetWindowPos(hwnd, 0, local_x, local_y, self.width(), self.height(), 0x0040)
+        else:
+            self.move(self.clamp_position(self.get_default_position()))
+            self.assert_topmost()
         self.save_config()
-        self.assert_topmost()
 
 
 def main():
@@ -962,6 +1114,14 @@ def main():
             hdesk = user32.OpenDesktopW("Default", 0, False, 0x01FF)
             if hdesk:
                 user32.SetThreadDesktop(hdesk)
+        except Exception:
+            pass
+
+        # Make sure Shell_TrayWnd has no leftover region hole from older versions
+        try:
+            tray = user32.FindWindowW("Shell_TrayWnd", None)
+            if tray:
+                user32.SetWindowRgn(tray, None, True)
         except Exception:
             pass
 
