@@ -43,6 +43,31 @@ try:
     user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
     user32.GetClassNameW.restype = ctypes.c_int
 
+    user32.SetPropW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.HANDLE]
+    user32.SetPropW.restype = wintypes.BOOL
+
+    WINEVENTPROC = ctypes.WINFUNCTYPE(
+        None,
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.HWND,
+        ctypes.c_long,
+        ctypes.c_long,
+        wintypes.DWORD,
+        wintypes.DWORD
+    )
+
+    user32.SetWinEventHook.argtypes = [
+        wintypes.DWORD, wintypes.DWORD,
+        wintypes.HMODULE, WINEVENTPROC,
+        wintypes.DWORD, wintypes.DWORD,
+        wintypes.DWORD
+    ]
+    user32.SetWinEventHook.restype = wintypes.HANDLE
+
+    user32.UnhookWinEvent.argtypes = [wintypes.HANDLE]
+    user32.UnhookWinEvent.restype = wintypes.BOOL
+
     HWND_TOPMOST = wintypes.HWND(-1)
     SWP_NOMOVE = 0x0002
     SWP_NOSIZE = 0x0001
@@ -53,6 +78,10 @@ try:
     WS_EX_TOOLWINDOW = 0x00000080
     WS_EX_NOACTIVATE = 0x08000000
     WS_CAPTION = 0x00C00000
+    WS_POPUP = 0x80000000
+    WINEVENT_OUTOFCONTEXT = 0x0000
+    WINEVENT_SKIPOWNPROCESS = 0x0002
+    EVENT_SYSTEM_FOREGROUND = 0x0003
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 except Exception:
     user32 = None
@@ -125,7 +154,7 @@ class ClaudeTaskbarWidget(QWidget):
         self.scale_factor = 3  # 3x scale: Claude body is 24px tall (50% of 48px taskbar)
         self.snap_to_bottom = True
         self.idle_animations_enabled = True
-        self.auto_hide_fullscreen = True
+        self.auto_hide_fullscreen = False
 
         # State
         self.current_anim_name = "idle"
@@ -161,32 +190,80 @@ class ClaudeTaskbarWidget(QWidget):
         self.idle_timer.timeout.connect(self._trigger_random_idle_action)
         self._schedule_next_idle(10000, 20000)
 
-        # Fullscreen detection timer: runs every 400ms smoothly with 3-tick debounce (1.2s)
+        # Fullscreen detection timer: runs every 400ms
         self.fullscreen_timer = QTimer(self)
         self.fullscreen_timer.timeout.connect(self._check_fullscreen)
         self.fullscreen_timer.start(400)
 
+        # Continuous Z-order maintenance timer (keeps Claude strictly above Shell_TrayWnd taskbar at all times)
+        self.zorder_timer = QTimer(self)
+        self.zorder_timer.timeout.connect(self.maintain_zorder)
+        self.zorder_timer.start(150)
+
+        # Hook Windows EVENT_SYSTEM_FOREGROUND so the instant any window opens, Claude stays on top
+        self._init_winevent_hook()
+
         # Initial frame
         self.play_idle()
+
+    def _init_winevent_hook(self):
+        """Hooks Windows foreground change events to guarantee 0ms latency topmost retention."""
+        if not user32:
+            return
+        try:
+            def win_event_callback(hHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime):
+                if hwnd and hwnd != int(self.winId()):
+                    self.maintain_zorder()
+
+            self._win_event_callback_ref = WINEVENTPROC(win_event_callback)
+            self._hook = user32.SetWinEventHook(
+                EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND,
+                0, self._win_event_callback_ref,
+                0, 0,
+                WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS
+            )
+        except Exception:
+            self._hook = None
+
+    def closeEvent(self, event):
+        if user32 and getattr(self, "_hook", None):
+            try:
+                user32.UnhookWinEvent(self._hook)
+                self._hook = None
+            except Exception:
+                pass
+        super().closeEvent(event)
 
     def showEvent(self, event):
         super().showEvent(event)
         self.apply_native_window_styles()
 
-    def apply_native_window_styles(self):
-        """Applies WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE cleanly without frame disruption."""
-        if not user32:
+    def maintain_zorder(self):
+        """Maintains Claude strictly on top of the taskbar (Shell_TrayWnd) in the topmost Z-band."""
+        if not user32 or not self.isVisible() or self.hidden_by_fullscreen:
             return
         try:
             hwnd = int(self.winId())
-            ex = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
             user32.SetWindowPos(
                 hwnd,
                 HWND_TOPMOST,
                 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER
             )
+        except Exception:
+            pass
+
+    def apply_native_window_styles(self):
+        """Applies WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE cleanly and sets NonRudeHWND property."""
+        if not user32:
+            return
+        try:
+            hwnd = int(self.winId())
+            ex = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
+            # Notify Windows Shell that this window does not suppress the taskbar
+            user32.SetPropW(hwnd, "NonRudeHWND", 1)
+            self.maintain_zorder()
         except Exception:
             pass
 
@@ -232,6 +309,10 @@ class ClaudeTaskbarWidget(QWidget):
             if (style & WS_CAPTION) == WS_CAPTION:
                 return False
 
+            # True fullscreen games are WS_POPUP (frameless borderless popups). Normal desktop windows are WS_OVERLAPPED.
+            if (style & WS_POPUP) != WS_POPUP:
+                return False
+
             # If Windows says it is accepting notifications, there is definitely no fullscreen game
             try:
                 if shell32:
@@ -267,6 +348,7 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
+                self.maintain_zorder()
             return
 
         screen = self.get_current_screen()
@@ -282,8 +364,8 @@ class ClaudeTaskbarWidget(QWidget):
 
         if is_full:
             self.fullscreen_consecutive_hits += 1
-            # Require 3 consecutive checks (~1.2 seconds) of true fullscreen before hiding
-            if self.fullscreen_consecutive_hits >= 3 and not self.hidden_by_fullscreen:
+            # Require 4 consecutive checks (~1.6 seconds) of true fullscreen before hiding
+            if self.fullscreen_consecutive_hits >= 4 and not self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = True
                 self.hide()
         else:
@@ -291,6 +373,7 @@ class ClaudeTaskbarWidget(QWidget):
             if self.hidden_by_fullscreen:
                 self.hidden_by_fullscreen = False
                 self.show()
+                self.maintain_zorder()
 
     def load_all_sprites(self):
         """Loads and organizes all raw 16x16 frames."""
@@ -493,7 +576,7 @@ class ClaudeTaskbarWidget(QWidget):
                     self.scale_factor = data.get("scale_factor", 3)
                     self.snap_to_bottom = data.get("snap_to_bottom", True)
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
-                    self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", True)
+                    self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", False)
                     if "x" in data and "y" in data:
                         self.saved_pos = QPoint(data["x"], data["y"])
             except Exception as e:
