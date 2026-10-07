@@ -1,0 +1,15 @@
+# Configuration
+config.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Preview / temp
+taskbar_preview.png
