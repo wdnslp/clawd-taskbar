@@ -3,7 +3,7 @@ Generates all pixel art animation frames for Claude Taskbar Mascot.
 All sprites are strictly 16x16 RGBA PNGs, matching the exact terracotta palette and art style.
 Strict character proportion rule: Claude's arms are strictly stubby (2x2 or 2x3 pixels),
 never elongated or noodle-like.
-Includes 30 high-concept animations.
+Includes 22 high-concept animations.
 """
 
 import os
@@ -18,18 +18,18 @@ C = (218, 119, 88, 255)      # Claude Terracotta Base
 CD = (186, 94, 66, 255)      # Claude Dark / Shading / Eyelids
 E = (0, 0, 0, 255)           # Eye / Black
 W = (255, 255, 255, 255)     # White
-R = (235, 65, 65, 255)       # Red (heart, bug)
+R = (235, 65, 65, 255)       # Red (heart)
 P = (245, 140, 160, 255)     # Pink (blush)
-Y = (255, 215, 0, 255)       # Yellow (gold, spark, stars, cheese)
-CY = (80, 220, 240, 255)     # Cyan (screen, cyber scan, energy)
+Y = (255, 215, 0, 255)       # Yellow (gold, spark, cheese)
+CY = (80, 220, 240, 255)     # Cyan (screen, cyber visor, energy)
 BR = (120, 65, 30, 255)      # Brown / Coffee / Wood
 GR = (170, 170, 175, 255)    # Grey (metal, laptop)
 DG = (100, 100, 105, 255)    # Dark Grey
-G = (40, 220, 60, 255)       # Neon Green (success checkmark, matrix)
+G = (40, 220, 60, 255)       # Neon Green (matrix)
 GD = (20, 140, 30, 255)      # Dark Green
 OR = (255, 120, 0, 255)      # Orange
 BL = (60, 130, 245, 255)     # Water / Tears / Magic Blue
-PU = (165, 80, 230, 255)     # Purple (wizard hat, zen aura)
+PU = (165, 80, 230, 255)     # Purple (wizard hat)
 CH = (255, 210, 30, 255)     # Gold / Shield Glow
 
 def make_empty_grid():
@@ -721,38 +721,7 @@ def gen_cry():
     save_frame(base, "cry", 5)
 
 # ==========================================
-# 20. Ghost (Привидение)
-# ==========================================
-def gen_ghost():
-    base = get_base_grid()
-    save_frame(base, "ghost", 0)
-
-    f1 = make_empty_grid()
-    for x in range(4, 12):
-        f1[4][x] = W; f1[5][x] = W
-    f1[5][5] = E; f1[5][10] = E
-    for y in range(6, 11):
-        for x in range(3, 13):
-            f1[y][x] = W
-    f1[11][3] = W; f1[11][5] = W; f1[11][7] = W; f1[11][9] = W; f1[11][11] = W
-    save_frame(f1, "ghost", 1)
-
-    f2 = make_empty_grid()
-    for y in range(4, 12):
-        for x in range(16):
-            if y - 2 >= 0:
-                f2[y - 2][x] = f1[y][x]
-    save_frame(f2, "ghost", 2)
-
-    f3 = [row[:] for row in f2]
-    f3[5][7] = E; f3[5][8] = E
-    save_frame(f3, "ghost", 3)
-
-    save_frame(f2, "ghost", 4)
-    save_frame(base, "ghost", 5)
-
-# ==========================================
-# 21. Spark (Фирменная искра Claude / AI Spark) - NEW
+# 20. Spark (Фирменная искра Claude / AI Spark) - NEW
 # ==========================================
 def gen_spark():
     base = get_base_grid()
@@ -838,128 +807,7 @@ def gen_chat():
     save_frame(base, "chat", 5)
 
 # ==========================================
-# 23. Zen (Медитация / Дзен-парение) - NEW
-# ==========================================
-def gen_zen():
-    base = get_base_grid()
-    # 0: Sits down in lotus pose
-    f0 = make_empty_grid()
-    for y in range(4, 10):
-        for x in range(16):
-            f0[y][x] = base[y][x]
-    # Folded legs (horizontal line)
-    for x in range(3, 13):
-        f0[10][x] = C
-    f0[5][5] = CD; f0[5][10] = CD  # eyes closed peacefully
-    save_frame(f0, "zen", 0)
-
-    # 1: Floats 1px up, subtle aura
-    f1 = make_empty_grid()
-    for y in range(4, 11):
-        for x in range(16):
-            f1[y - 1][x] = f0[y][x]
-    # Aura dots below
-    f1[11][5] = CY; f1[11][10] = CY
-    save_frame(f1, "zen", 1)
-
-    # 2: Floats 2px up, aura expands
-    f2 = make_empty_grid()
-    for y in range(4, 11):
-        for x in range(16):
-            f2[y - 2][x] = f0[y][x]
-    f2[10][4] = PU; f2[11][6] = CY; f2[11][9] = CY; f2[10][11] = PU
-    save_frame(f2, "zen", 2)
-
-    # 3: Peak zen peace (aura pulses soft gold/cyan)
-    f3 = [row[:] for row in f2]
-    f3[10][4] = CY; f3[11][7] = W; f3[11][8] = W; f3[10][11] = CY
-    save_frame(f3, "zen", 3)
-
-    # 4: Soft descent 1px
-    save_frame(f1, "zen", 4)
-
-    # 5: Lands softly, eyes open
-    save_frame(f0, "zen", 5)
-    save_frame(base, "zen", 6)
-
-# ==========================================
-# 24. Bug (Поимка бага -> Зеленая галочка) - NEW
-# ==========================================
-def gen_bug():
-    base = get_base_grid()
-    # 0: Red 1x1 bug flying at top right, Claude looks
-    f0 = [row[:] for row in base]
-    f0[4][14] = R
-    f0[5][5] = C; f0[5][10] = C; f0[5][6] = E; f0[5][11] = E  # eyes right
-    save_frame(f0, "bug", 0)
-
-    # 1: Bug flies closer to chest
-    f1 = [row[:] for row in base]
-    f1[6][12] = R
-    save_frame(f1, "bug", 1)
-
-    # 2: TRAPPED! Short stubby paws meet at chest (cols 7-8)
-    f2 = [row[:] for row in base]
-    f2[7][2] = T; f2[7][13] = T
-    f2[7][7] = C; f2[7][8] = C
-    save_frame(f2, "bug", 2)
-
-    # 3: Green glow between paws
-    f3 = [row[:] for row in f2]
-    f3[6][7] = G; f3[6][8] = G
-    save_frame(f3, "bug", 3)
-
-    # 4: Checkmark appears! ✔ (cols 12-14, rows 3-5)
-    f4 = [row[:] for row in base]
-    f4[5][11] = G
-    f4[6][12] = G
-    f4[5][13] = G; f4[4][14] = G; f4[3][15] = G  # checkmark!
-    f4[5][5] = CD; f4[5][10] = CD                # happy eyes
-    save_frame(f4, "bug", 4)
-
-    # 5: Checkmark sparkles and fades
-    f5 = [row[:] for row in base]
-    f5[3][14] = W
-    save_frame(f5, "bug", 5)
-    save_frame(base, "bug", 6)
-
-# ==========================================
-# 25. Scan (Кибер-сканер / Радар данных) - NEW
-# ==========================================
-def gen_scan():
-    base = get_base_grid()
-    # 0: Focused
-    save_frame(base, "scan", 0)
-
-    # 1: Eyes activate cyber cyan
-    f1 = [row[:] for row in base]
-    f1[5][5] = CY; f1[5][10] = CY
-    save_frame(f1, "scan", 1)
-
-    # 2: Horizontal laser scan line at row 4
-    f2 = [row[:] for row in f1]
-    for x in range(4, 12):
-        f2[4][x] = CY
-    f2[4][7] = W; f2[4][8] = W
-    save_frame(f2, "scan", 2)
-
-    # 3: Laser scan sweeps down to row 6
-    f3 = [row[:] for row in f1]
-    for x in range(3, 13):
-        f3[6][x] = CY
-    f3[6][7] = W; f3[6][8] = W
-    save_frame(f3, "scan", 3)
-
-    # 4: Holographic data ping at top right
-    f4 = [row[:] for row in f1]
-    f4[1][13] = CY; f4[1][14] = W; f4[2][14] = CY
-    save_frame(f4, "scan", 4)
-
-    # 5: Scan complete, eyes back to normal
-    save_frame(base, "scan", 5)
-
-# ==========================================
-# 26. Shield (Защитный купол / AI Safety) - NEW
+# 22. Shield (Защитный купол / AI Safety) - NEW
 # ==========================================
 def gen_shield():
     base = get_base_grid()
@@ -999,169 +847,10 @@ def gen_shield():
     save_frame(base, "shield", 6)
 
 # ==========================================
-# 27. Battery (Подзарядка молнией / 100%) - NEW
-# ==========================================
-def gen_battery():
-    base = get_base_grid()
-    # 0: Low battery indicator above head (1 red bar)
-    f0 = [row[:] for row in base]
-    # Battery shell: rows 1-2, cols 7-11
-    for x in range(7, 12):
-        f0[1][x] = GR; f0[3][x] = GR
-    f0[2][6] = GR; f0[2][12] = GR
-    f0[2][7] = R  # low red bar
-    f0[5][5] = CD; f0[5][10] = CD  # tired eyes
-    save_frame(f0, "battery", 0)
-
-    # 1: Golden lightning bolt strikes battery ⚡
-    f1 = [row[:] for row in f0]
-    f1[0][9] = Y; f1[1][8] = Y; f1[2][9] = Y; f1[2][8] = W
-    save_frame(f1, "battery", 1)
-
-    # 2: Charging up! (Yellow & green bars)
-    f2 = [row[:] for row in f0]
-    f2[2][7] = G; f2[2][8] = G; f2[2][9] = Y
-    save_frame(f2, "battery", 2)
-
-    # 3: 100% FULL! Neon green glow
-    f3 = [row[:] for row in f0]
-    for x in range(7, 12):
-        f3[2][x] = G
-    f3[5][5] = E; f3[5][10] = E  # eyes wide
-    save_frame(f3, "battery", 3)
-
-    # 4: Energized hop! Power sparkles
-    f4 = make_empty_grid()
-    for y in range(4, 12):
-        for x in range(16):
-            f4[y - 1][x] = base[y][x]
-    f4[3][3] = Y; f4[3][12] = Y  # sparkles
-    save_frame(f4, "battery", 4)
-
-    # 5: Back to base, fully energized
-    save_frame(base, "battery", 5)
-
-# ==========================================
-# 28. Origami (Складывает бумажный кораблик) - NEW
-# ==========================================
-def gen_origami():
-    base = get_base_grid()
-    # 0: Holding a square white sheet of paper at chest
-    f0 = [row[:] for row in base]
-    for y in (7, 8):
-        for x in (7, 8, 9):
-            f0[y][x] = W
-    save_frame(f0, "origami", 0)
-
-    # 1: Corner folded into triangle
-    f1 = [row[:] for row in base]
-    f1[6][8] = W
-    f1[7][7] = W; f1[7][8] = W; f1[7][9] = W
-    save_frame(f1, "origami", 1)
-
-    # 2: Creasing edges
-    f2 = [row[:] for row in base]
-    f2[6][8] = W; f2[7][8] = GR; f2[8][8] = W
-    save_frame(f2, "origami", 2)
-
-    # 3: Perfect tiny white paper sailboat!
-    f3 = [row[:] for row in base]
-    # Sail
-    f3[5][12] = W
-    f3[6][11] = W; f3[6][12] = W
-    # Boat hull
-    f3[7][10] = W; f3[7][11] = W; f3[7][12] = W; f3[7][13] = W
-    f3[8][11] = GR; f3[8][12] = GR
-    # Claude admires with happy eyes
-    f3[5][5] = CD; f3[5][10] = CD
-    save_frame(f3, "origami", 3)
-
-    # 4: Boat bobs slightly
-    f4 = [row[:] for row in f3]
-    f4[6][14] = CY  # tiny water ripple
-    save_frame(f4, "origami", 4)
-
-    # 5: Lowers boat, smiling
-    save_frame(base, "origami", 5)
-
-# ==========================================
-# 29. Stars (Звездопад / Созвездие) - NEW
-# ==========================================
-def gen_stars():
-    base = get_base_grid()
-    # 0: Looks up at night sky
-    f0 = [row[:] for row in base]
-    f0[5][5] = C; f0[5][10] = C; f0[4][5] = E; f0[4][10] = E
-    save_frame(f0, "stars", 0)
-
-    # 1: First star appears
-    f1 = [row[:] for row in f0]
-    f1[1][3] = Y
-    save_frame(f1, "stars", 1)
-
-    # 2: Second star sparkles
-    f2 = [row[:] for row in f0]
-    f2[1][3] = Y; f2[1][12] = CY
-    save_frame(f2, "stars", 2)
-
-    # 3: Shooting star streaks across!
-    f3 = [row[:] for row in f0]
-    f3[1][3] = Y; f3[1][12] = CY
-    # streak
-    f3[0][6] = W; f3[0][7] = Y; f3[1][8] = W; f3[2][9] = Y
-    save_frame(f3, "stars", 3)
-
-    # 4: Constellation connects with faint line
-    f4 = [row[:] for row in f0]
-    f4[1][3] = Y; f4[2][7] = Y; f4[1][12] = Y
-    f4[1][5] = CH; f4[2][9] = CH  # connecting starlight
-    save_frame(f4, "stars", 4)
-
-    # 5: Claude makes a wish with eyes closed
-    f5 = [row[:] for row in base]
-    f5[5][5] = CD; f5[5][10] = CD
-    save_frame(f5, "stars", 5)
-    save_frame(base, "stars", 6)
-
-# ==========================================
-# 30. Tea (Уютное чаепитие с паром) - NEW
-# ==========================================
-def gen_tea():
-    base = get_base_grid()
-    # 0: Holding a tiny teacup with saucer at chest
-    f0 = [row[:] for row in base]
-    f0[8][7] = W; f0[8][8] = BR; f0[8][9] = W   # cup
-    f0[9][6] = W; f0[9][7] = W;  f0[9][8] = W; f0[9][9] = W; f0[9][10] = W  # saucer
-    save_frame(f0, "tea", 0)
-
-    # 1: Gentle wisp of white steam rises
-    f1 = [row[:] for row in f0]
-    f1[7][8] = W; f1[6][9] = W
-    save_frame(f1, "tea", 1)
-
-    # 2: Steam curls higher, blowing softly
-    f2 = [row[:] for row in f0]
-    f2[6][8] = W; f2[5][9] = W; f2[4][8] = W
-    save_frame(f2, "tea", 2)
-
-    # 3: Peaceful sip (eyes closed in warmth)
-    f3 = [row[:] for row in f0]
-    f3[5][5] = CD; f3[5][10] = CD
-    f3[6][4] = P; f3[6][11] = P  # warm blush
-    save_frame(f3, "tea", 3)
-
-    # 4: Holds warm cup, content smile
-    f4 = [row[:] for row in f0]
-    f4[6][4] = P; f4[6][11] = P
-    f4[7][8] = W  # small steam puff
-    save_frame(f4, "tea", 4)
-    save_frame(base, "tea", 5)
-
-# ==========================================
-# Main: Run all generators
+# Main: Run all generators (22 Animations)
 # ==========================================
 def main():
-    print("Generating pixel art animation frames for 30 Claude animations...")
+    print("Generating pixel art animation frames for 22 Claude animations...")
     # Classic & Core
     gen_blink()
     gen_look_around()
@@ -1182,22 +871,15 @@ def main():
     gen_wizard()
     gen_workout()
     gen_cry()
-    gen_ghost()
 
-    # 10 Brand New Conceptual Animations (strictly stubby limbs!)
+    # Conceptual Claude Animations
     gen_spark()
     gen_chat()
-    gen_zen()
-    gen_bug()
-    gen_scan()
     gen_shield()
-    gen_battery()
-    gen_origami()
-    gen_stars()
-    gen_tea()
 
     count = len([f for f in os.listdir(OUTPUT_DIR) if f.endswith(".png")])
-    print(f"Successfully generated {count} animation frames across 30 animations in {OUTPUT_DIR}!")
+    print(f"Successfully generated {count} animation frames across 22 animations in {OUTPUT_DIR}!")
 
 if __name__ == "__main__":
     main()
+

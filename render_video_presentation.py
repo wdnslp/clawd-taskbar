@@ -1,6 +1,6 @@
 """
 Renders a broadcast-quality Full HD (1920x1080 @ 30 FPS) MP4 video presentation
-showcasing all 30 high-concept animations of the Claude Taskbar Mascot with titles,
+showcasing all 22 high-concept animations of the Claude Taskbar Mascot with titles,
 categories, statistics, magnified hero previews, and real-time taskbar simulation.
 """
 
@@ -31,16 +31,13 @@ ANIMATIONS_META = [
     {"name": "spark", "title": "Искра Claude (AI Spark)", "cat": "Фирменный Claude", "desc": "В глазах зажигается золото, рождается сияющая звезда Claude", "speed_ms": 110, "tag": "MAGIC"},
     {"name": "chat", "title": "Ответ Claude (Chat ...)", "cat": "Фирменный Claude", "desc": "Облако мыслей с бегающими точками и вспышка готового ответа", "speed_ms": 120, "tag": "TECH"},
     {"name": "shield", "title": "Защитный купол (Shield)", "cat": "Фирменный Claude", "desc": "Энергетический шестиугольный барьер безопасности и защиты", "speed_ms": 120, "tag": "MAGIC"},
-    {"name": "battery", "title": "Подзарядка 100% (Battery)", "cat": "Фирменный Claude", "desc": "Молния заряжает батарею до максимума мощности", "speed_ms": 110, "tag": "TECH"},
-    {"name": "scan", "title": "Кибер-сканер (Scan)", "cat": "Фирменный Claude", "desc": "Лазерное сканирование данных и голографический пинг", "speed_ms": 120, "tag": "TECH"},
     {"name": "matrix", "title": "Матрица / Хакер (Matrix)", "cat": "Фирменный Claude", "desc": "Зеленый цифровой поток кода и светящийся кибер-визор", "speed_ms": 120, "tag": "TECH"},
 
-    # 2. Tech & Code
-    {"name": "typing", "title": "Кодить за ноутбуком (Typing)", "cat": "Работа и код", "desc": "Длинная сессия кодинга, хакерский рывок и успешный билд", "speed_ms": 110, "tag": "TECH"},
-    {"name": "bug", "title": "Поимка бага (Bug -> ✔)", "cat": "Работа и код", "desc": "Ловит красный баг и превращает его в зеленую галочку успеха", "speed_ms": 110, "tag": "TECH"},
-    {"name": "idea", "title": "Осенила идея (Idea)", "cat": "Работа и код", "desc": "Яркая вспышка лампочки с лучами вдохновения", "speed_ms": 120, "tag": "TECH"},
-    {"name": "coffee", "title": "Выпить чашку кофе (Coffee)", "cat": "Работа и код", "desc": "Горячая кружка кофе с ароматным паром", "speed_ms": 140, "tag": "TECH"},
-    {"name": "tea", "title": "Уютный чай (Tea)", "cat": "Работа и код", "desc": "Неспешное теплое чаепитие с белым паром", "speed_ms": 130, "tag": "TECH"},
+    # 2. Tech & Leisure
+    {"name": "typing", "title": "Кодить за ноутбуком (Typing)", "cat": "Работа и отдых", "desc": "Длинная сессия кодинга, хакерский рывок и успешный билд", "speed_ms": 110, "tag": "TECH"},
+    {"name": "idea", "title": "Осенила идея (Idea)", "cat": "Работа и отдых", "desc": "Яркая вспышка лампочки с лучами вдохновения", "speed_ms": 120, "tag": "TECH"},
+    {"name": "coffee", "title": "Выпить чашку кофе (Coffee)", "cat": "Работа и отдых", "desc": "Горячая кружка кофе с ароматным паром", "speed_ms": 140, "tag": "TECH"},
+    {"name": "pizza", "title": "Кушать пиццу (Pizza)", "cat": "Работа и отдых", "desc": "Аппетитный горячий ломтик с тянущимся сыром", "speed_ms": 120, "tag": "MEME"},
 
     # 3. Emotions & Gestures
     {"name": "wave", "title": "Помахать рукой (Wave)", "cat": "Эмоции и жесты", "desc": "Дружелюбный привет пользователю аккуратной короткой лапкой", "speed_ms": 110, "tag": "EMOTION"},
@@ -53,20 +50,13 @@ ANIMATIONS_META = [
     {"name": "look_around", "title": "Оглядеться по сторонам", "cat": "Эмоции и жесты", "desc": "Любопытный взгляд влево, вправо и по центру", "speed_ms": 130, "tag": "EMOTION"},
     {"name": "blink", "title": "Моргание (Blink)", "cat": "Эмоции и жесты", "desc": "Естественное моргание глазками в фоновом режиме", "speed_ms": 90, "tag": "EMOTION"},
 
-    # 4. Cozy & Craft
-    {"name": "zen", "title": "Дзен / Медитация (Zen)", "cat": "Уют и творчество", "desc": "Поза лотоса, мягкое парение в воздухе и гармония", "speed_ms": 150, "tag": "MAGIC"},
-    {"name": "origami", "title": "Кораблик оригами (Origami)", "cat": "Уют и творчество", "desc": "Складывает белый бумажный кораблик в лапках", "speed_ms": 130, "tag": "MAGIC"},
-    {"name": "stars", "title": "Звездопад / Созвездие (Stars)", "cat": "Уют и творчество", "desc": "Падающая звезда, созвездие и загаданное желание", "speed_ms": 130, "tag": "MAGIC"},
-    {"name": "pizza", "title": "Кушать пиццу (Pizza)", "cat": "Уют и творчество", "desc": "Аппетитный горячий ломтик с тянущимся сыром", "speed_ms": 120, "tag": "MEME"},
-
-    # 5. Magic & Action
+    # 4. Magic & Action
     {"name": "wizard", "title": "Волшебник (Wizard)", "cat": "Магия и экшен", "desc": "Шляпа мага, взмах палочки и сноп волшебных звезд", "speed_ms": 120, "tag": "MAGIC"},
     {"name": "workout", "title": "Качалка / Штанга (Workout)", "cat": "Магия и экшен", "desc": "Рывок тяжелой штанги над головой и победный флекс", "speed_ms": 120, "tag": "MAGIC"},
-    {"name": "ghost", "title": "Привидение / Бу! (Ghost)", "cat": "Магия и экшен", "desc": "Превращение в милое привидение с криком Бу!", "speed_ms": 110, "tag": "MAGIC"},
     {"name": "spin", "title": "Крутиться на 360° (Spin)", "cat": "Магия и экшен", "desc": "Стремительный полный оборот вокруг своей оси", "speed_ms": 90, "tag": "MAGIC"},
     {"name": "peek", "title": "Прятаться за панель (Peek)", "cat": "Магия и экшен", "desc": "Опускается за край панели и выглядывает", "speed_ms": 120, "tag": "MAGIC"},
 
-    # 6. Modes
+    # 5. Modes
     {"name": "sleep", "title": "Заснуть (Sleep Zzz)", "cat": "Режимы", "desc": "Глубокий уютный сон с улетающими буквами Zzz", "speed_ms": 200, "tag": "MODE"},
 ]
 
@@ -220,12 +210,12 @@ def render_intro_slide(base_bg):
     draw.text((cx - 165, cy - 168), "★  OFFICIAL MASCOT SHOWCASE", fill=(255, 230, 220, 255), font=FONT_BADGE)
 
     draw.text((cx - 520, cy - 90), "CLAUDE PIXEL TASKBAR", fill=(255, 255, 255, 255), font=FONT_HERO)
-    draw.text((cx - 390, cy), "30 КОНЦЕПТУАЛЬНЫХ АНИМАЦИЙ", fill=(218, 119, 88, 255), font=FONT_HERO_SUB)
+    draw.text((cx - 390, cy), "22 КОНЦЕПТУАЛЬНЫЕ АНИМАЦИИ", fill=(218, 119, 88, 255), font=FONT_HERO_SUB)
 
     sub = "Пиксельный маскот для панели задач Windows 11 с правильными пропорциями и 0% CPU"
     draw.text((cx - 440, cy + 80), sub, fill=(180, 185, 200, 255), font=FONT_BODY)
 
-    pills = ["193 Спрайта", "16x16 Pixel Art", "Истинные пропорции", "Windows 11 Ready"]
+    pills = ["141 Спрайт", "16x16 Pixel Art", "Истинные пропорции", "Windows 11 Ready"]
     for i, p in enumerate(pills):
         px = cx - 380 + i * 200
         py = cy + 160
@@ -239,7 +229,7 @@ def render_outro_slide(base_bg):
     draw = ImageDraw.Draw(img)
 
     cx, cy = WIDTH // 2, HEIGHT // 2 - 40
-    draw.text((cx - 430, cy - 100), "ВСЕ 30 АНИМАЦИЙ ГОТОВЫ!", fill=(255, 255, 255, 255), font=FONT_HERO)
+    draw.text((cx - 430, cy - 100), "ВСЕ 22 АНИМАЦИИ ГОТОВЫ!", fill=(255, 255, 255, 255), font=FONT_HERO)
     draw.text((cx - 380, cy), "Нажмите правой кнопкой мыши по Клоду,", fill=(218, 119, 88, 255), font=FONT_HERO_SUB)
     draw.text((cx - 350, cy + 50), "чтобы запустить любую анимацию в меню!", fill=(218, 119, 88, 255), font=FONT_HERO_SUB)
 
@@ -247,7 +237,7 @@ def render_outro_slide(base_bg):
     return img
 
 def main():
-    print("Preparing 1080p 60 FPS video renderer for 30 Claude animations...")
+    print("Preparing 1080p 60 FPS video renderer for 22 Claude animations...")
     base_bg = create_background()
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
