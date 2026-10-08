@@ -882,6 +882,87 @@ def make_lifted_head_torso(eye_mode="surprised", sweat=False, tilt=0):
 
     return g
 
+def make_minimal_body():
+    """
+    Exact base Claude body, NO mouth.
+    Row 4: head top
+    Row 5: eyes at col 5 and 10, rest solid C. NO MOUTH.
+    Rows 6-9: solid torso
+    """
+    g = make_empty_grid()
+    for x in range(4, 12):
+        g[4][x] = C
+    for x in range(4, 12):
+        g[5][x] = C
+    g[5][5] = E
+    g[5][10] = E
+    for y in (6, 7, 8, 9):
+        for x in range(4, 12):
+            g[y][x] = C
+    return g
+
+# 0. Minimalist (Самый минималистичный: руки 2x2 вверх-вниз, ноги +1px / -1px)
+def gen_drag_minimal():
+    # Frame 0: Left arm 2x2 UP (rows 5-6), Right arm 2x2 DOWN (rows 7-8)
+    # Left legs 1px shorter (row 10), Right legs 1px longer (rows 10-12)
+    f0 = make_minimal_body()
+    f0[5][2] = C; f0[5][3] = C
+    f0[6][2] = C; f0[6][3] = C
+    f0[7][12] = C; f0[7][13] = C
+    f0[8][12] = C; f0[8][13] = C
+    f0[10][4] = C; f0[10][6] = C
+    f0[10][9] = C; f0[10][11] = C
+    f0[11][9] = C; f0[11][11] = C
+    f0[12][9] = C; f0[12][11] = C
+    save_frame(f0, "drag_minimal", 0)
+    save_frame(f0, "drag", 0)
+
+    # Frame 1: Left arm 2x2 DOWN (rows 7-8), Right arm 2x2 UP (rows 5-6)
+    # Left legs 1px longer (rows 10-12), Right legs 1px shorter (row 10)
+    f1 = make_minimal_body()
+    f1[7][2] = C; f1[7][3] = C
+    f1[8][2] = C; f1[8][3] = C
+    f1[5][12] = C; f1[5][13] = C
+    f1[6][12] = C; f1[6][13] = C
+    f1[10][4] = C; f1[10][6] = C
+    f1[11][4] = C; f1[11][6] = C
+    f1[12][4] = C; f1[12][6] = C
+    f1[10][9] = C; f1[10][11] = C
+    save_frame(f1, "drag_minimal", 1)
+    save_frame(f1, "drag", 1)
+
+    save_frame(f0, "drag_minimal", 2)
+    save_frame(f1, "drag_minimal", 3)
+    save_frame(f0, "drag", 2)
+    save_frame(f1, "drag", 3)
+
+# 0b. Sync Minimalist (Синхронный: обе руки 2x2 вверх-вниз, все 4 ноги +1px / -1px)
+def gen_drag_sync():
+    # Frame 0: Both arms 2x2 UP (rows 5-6), all 4 legs 1px shorter (row 10)
+    f0 = make_minimal_body()
+    f0[5][2] = C; f0[5][3] = C
+    f0[6][2] = C; f0[6][3] = C
+    f0[5][12] = C; f0[5][13] = C
+    f0[6][12] = C; f0[6][13] = C
+    for col in (4, 6, 9, 11):
+        f0[10][col] = C
+    save_frame(f0, "drag_sync", 0)
+
+    # Frame 1: Both arms 2x2 DOWN (rows 7-8), all 4 legs 1px longer (rows 10-12)
+    f1 = make_minimal_body()
+    f1[7][2] = C; f1[7][3] = C
+    f1[8][2] = C; f1[8][3] = C
+    f1[7][12] = C; f1[7][13] = C
+    f1[8][12] = C; f1[8][13] = C
+    for col in (4, 6, 9, 11):
+        f1[10][col] = C
+        f1[11][col] = C
+        f1[12][col] = C
+    save_frame(f1, "drag_sync", 1)
+
+    save_frame(f0, "drag_sync", 2)
+    save_frame(f1, "drag_sync", 3)
+
 # 1. Pedal (Велосипедик — активный перебор ножками)
 def gen_drag_pedal():
     f0 = make_lifted_head_torso("surprised", sweat=True)
@@ -890,7 +971,6 @@ def gen_drag_pedal():
     f0[8][5] = C; f0[8][6] = C; f0[9][5] = C
     f0[8][9] = C; f0[8][10] = C; f0[9][10] = C; f0[10][10] = C; f0[11][10] = C
     save_frame(f0, "drag_pedal", 0)
-    save_frame(f0, "drag", 0)
 
     f1 = make_lifted_head_torso("surprised", sweat=False)
     f1[6][2] = C; f1[6][3] = C
@@ -898,7 +978,6 @@ def gen_drag_pedal():
     f1[8][5] = C; f1[8][6] = C; f1[9][5] = C; f1[10][5] = C; f1[11][5] = C
     f1[8][9] = C; f1[8][10] = C; f1[9][9] = C
     save_frame(f1, "drag_pedal", 1)
-    save_frame(f1, "drag", 1)
 
     f2 = make_lifted_head_torso("surprised", sweat=True)
     f2[7][2] = C; f2[7][3] = C
@@ -906,7 +985,6 @@ def gen_drag_pedal():
     f2[8][5] = C; f2[8][6] = C; f2[9][6] = C
     f2[8][9] = C; f2[8][10] = C; f2[9][10] = C; f2[10][10] = C; f2[11][11] = C
     save_frame(f2, "drag_pedal", 2)
-    save_frame(f2, "drag", 2)
 
     f3 = make_lifted_head_torso("surprised", sweat=False)
     f3[6][2] = C; f3[6][3] = C
@@ -914,7 +992,6 @@ def gen_drag_pedal():
     f3[8][5] = C; f3[8][6] = C; f3[9][5] = C; f3[10][6] = C
     f3[8][9] = C; f3[8][10] = C; f3[9][10] = C
     save_frame(f3, "drag_pedal", 3)
-    save_frame(f3, "drag", 3)
 
 # 2. Flail (Забавная паника / Быстрое барахтанье)
 def gen_drag_flail():
@@ -1157,7 +1234,9 @@ def main():
     gen_chat()
     gen_shield()
 
-    # Physics / Interactive Drag & Land (6 вариантов поднятия + приземление)
+    # Physics / Interactive Drag & Land (Минималистичные + Стили + Приземление)
+    gen_drag_minimal()
+    gen_drag_sync()
     gen_drag_pedal()
     gen_drag_flail()
     gen_drag_swing()
