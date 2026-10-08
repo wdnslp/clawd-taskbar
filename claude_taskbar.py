@@ -223,10 +223,10 @@ class RoamZoneOverlayWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # Cancel any ongoing slow roaming step immediately
-            if self._roam_step_timer.isActive():
-                self._roam_step_timer.stop()
-                self._roam_steps_remaining = 0
+            # Cancel any ongoing slow roaming step on Claude immediately
+            if hasattr(self.claude_widget, "_roam_step_timer") and self.claude_widget._roam_step_timer.isActive():
+                self.claude_widget._roam_step_timer.stop()
+                self.claude_widget._roam_steps_remaining = 0
             pos = event.pos()
             if self.is_over_close_btn(pos):
                 self.hide()
