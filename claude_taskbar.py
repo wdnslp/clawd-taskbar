@@ -157,10 +157,9 @@ class ClaudeTaskbarWidget(QWidget):
         self.current_pixmap = None
         self.drag_start_pos = None
         self.window_start_pos = None
-        self.window_start_screen_pos = None
+        self.window_start_screen_x = None
         self.is_dragging = False
         self.is_lifted = False
-        self.was_embedded_before_lift = False
         self.on_anim_finished = None
 
         # Fullscreen & Taskbar Embedding state
@@ -267,10 +266,9 @@ class ClaudeTaskbarWidget(QWidget):
         except Exception as e:
             print("embed_in_taskbar error:", e)
 
-    def unembed_from_taskbar(self, pos=None):
+    def unembed_from_taskbar(self):
         """
-        Restores Claude as a top-level topmost window when in 'top' placement mode
-        or when lifted off the taskbar during drag.
+        Restores Claude as a top-level topmost window when in 'top' placement mode.
         """
         if not user32 or not self._is_embedded:
             return
@@ -279,13 +277,10 @@ class ClaudeTaskbarWidget(QWidget):
             if not hwnd:
                 return
 
-            if pos is not None:
-                screen_x, screen_y = pos.x(), pos.y()
-            else:
-                tray_r = self.get_tray_rect()
-                screen_x = (tray_r.left if tray_r else 0) + self.x()
-                screen = self.get_current_screen()
-                screen_y = self.get_taskbar_top_y(screen)
+            tray_r = self.get_tray_rect()
+            screen_x = (tray_r.left if tray_r else 0) + self.x()
+            screen = self.get_current_screen()
+            screen_y = self.get_taskbar_top_y(screen)
 
             user32.SetParent(hwnd, 0)
             style = user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE
@@ -439,7 +434,7 @@ class ClaudeTaskbarWidget(QWidget):
            so Claude is rendered by DWM directly as part of the taskbar and never occluded by Windows panels.
         2. When top-level ('top' mode): maintains Shell_TrayWnd ownership and asserts topmost Z-order.
         """
-        if not user32 or not self.isVisible() or self.hidden_by_fullscreen or getattr(self, "is_lifted", False):
+        if not user32 or not self.isVisible() or self.hidden_by_fullscreen or getattr(self, "is_lifted", False) or self.is_dragging:
             return
 
         if self.placement_mode == "bottom" and self._is_embedded:
@@ -862,60 +857,82 @@ class ClaudeTaskbarWidget(QWidget):
             self.drag_start_pos = event.globalPosition().toPoint()
             self.is_dragging = False
             self.is_lifted = False
-            self.was_embedded_before_lift = bool(self.placement_mode == "bottom" and self._is_embedded)
 
-            if user32:
+            if self.placement_mode == "bottom" and self._is_embedded and user32:
                 hwnd = int(self.winId())
                 wr = wintypes.RECT()
                 user32.GetWindowRect(hwnd, ctypes.byref(wr))
-                self.window_start_screen_pos = QPoint(wr.left, wr.top)
+                self.window_start_screen_x = wr.left
+                self.window_start_pos = self.pos()
             else:
-                self.window_start_screen_pos = self.pos()
+                self.window_start_pos = self.pos()
+                self.window_start_screen_x = self.x()
 
     def mouseMoveEvent(self, event):
-        if (event.buttons() & Qt.MouseButton.LeftButton) and self.drag_start_pos and self.window_start_screen_pos:
+        if (event.buttons() & Qt.MouseButton.LeftButton) and self.drag_start_pos:
             delta = event.globalPosition().toPoint() - self.drag_start_pos
 
             # Rule: Cannot drag horizontally directly on the taskbar.
-            # Must first pull UPWARDS by at least 12px (negative Y) to lift Claude off the floor!
-            LIFT_THRESHOLD = 12
+            # Must first pull UPWARDS by at least 8px (negative Y) to lift Claude off the floor!
+            LIFT_THRESHOLD = 8
 
             if not self.is_lifted:
                 if delta.y() <= -LIFT_THRESHOLD:
                     self.is_lifted = True
                     self.is_dragging = True
-
-                    target_pos = self.window_start_screen_pos + delta
-                    if self._is_embedded:
-                        self.unembed_from_taskbar(target_pos)
-                    else:
-                        self.move(target_pos)
-
                     # Play looping drag animation: flailing little paws and bicycling feet!
                     self.play_animation("drag", loop=True, speed_ms=85)
-                    self.assert_topmost()
                 else:
                     # User only moved horizontally or downwards:
                     # Claude resists and stays planted on the floor!
                     return
 
             if self.is_lifted:
-                target_pos = self.window_start_screen_pos + delta
-                self.move(target_pos)
-                self.assert_topmost()
+                if self.placement_mode == "bottom" and self._is_embedded and user32:
+                    tray_r = self.get_tray_rect()
+                    if tray_r:
+                        tray_w = tray_r.right - tray_r.left
+                        tray_h = tray_r.bottom - tray_r.top
+                        start_x = self.window_start_screen_x if self.window_start_screen_x is not None else (tray_r.left + self.x())
+                        target_screen_x = start_x + delta.x()
+                        local_x = max(0, min(tray_w - self.width(), target_screen_x - tray_r.left))
+
+                        # Lifted off the floor: move up from floor (12) towards top of taskbar (0)
+                        floor_y = tray_h - (12 * self.scale_factor)
+                        lift_offset = min(floor_y, max(8, -delta.y()))
+                        lifted_y = max(0, floor_y - lift_offset)
+
+                        hwnd = int(self.winId())
+                        user32.SetWindowPos(hwnd, 0, local_x, lifted_y, self.width(), self.height(), 0x0040)
+                        user32.BringWindowToTop(hwnd)
+                else:
+                    # Top placement mode:
+                    start_pos = self.window_start_pos if self.window_start_pos else self.pos()
+                    target_pos = start_pos + delta
+                    self.move(self.clamp_position(target_pos))
+                    self.assert_topmost()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             if self.is_lifted:
-                # Claude lands back down on the taskbar floor at his new horizontal position!
-                drop_screen_x = self.x()
-                screen = self.get_current_screen()
-
-                if self.placement_mode == "bottom" and self.was_embedded_before_lift:
-                    self.embed_in_taskbar(target_screen_x=drop_screen_x)
+                if self.placement_mode == "bottom" and self._is_embedded and user32:
+                    tray_r = self.get_tray_rect()
+                    if tray_r:
+                        tray_w = tray_r.right - tray_r.left
+                        tray_h = tray_r.bottom - tray_r.top
+                        delta = event.globalPosition().toPoint() - self.drag_start_pos if self.drag_start_pos else QPoint(0, 0)
+                        start_x = self.window_start_screen_x if self.window_start_screen_x is not None else (tray_r.left + self.x())
+                        target_screen_x = start_x + delta.x()
+                        local_x = max(0, min(tray_w - self.width(), target_screen_x - tray_r.left))
+                        floor_y = tray_h - (12 * self.scale_factor)
+                        hwnd = int(self.winId())
+                        user32.SetWindowPos(hwnd, 0, local_x, floor_y, self.width(), self.height(), 0x0040)
+                        user32.BringWindowToTop(hwnd)
+                        self.saved_pos = QPoint(tray_r.left + local_x, tray_r.top + floor_y)
                 else:
+                    screen = self.get_current_screen()
                     target_y = self.get_taskbar_top_y(screen) if self.placement_mode == "top" else self.get_taskbar_bottom_y(screen)
-                    self.move(self.clamp_position(QPoint(drop_screen_x, target_y)))
+                    self.move(self.clamp_position(QPoint(self.x(), target_y)))
                     self.assert_topmost()
 
                 self.save_config()
@@ -931,7 +948,8 @@ class ClaudeTaskbarWidget(QWidget):
                     self.play_idle()
 
             self.drag_start_pos = None
-            self.window_start_screen_pos = None
+            self.window_start_pos = None
+            self.window_start_screen_x = None
             self.is_dragging = False
             self.is_lifted = False
 
