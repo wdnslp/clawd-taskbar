@@ -10,6 +10,11 @@ from PyQt6.QtWidgets import QApplication, QWidget, QMenu
 from PyQt6.QtGui import QImage, QPixmap, QPainter, QCursor, QColor
 from PyQt6.QtCore import Qt, QTimer, QPoint
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 # Configure high-DPI scaling policy before QApplication creation for pixel-perfect rendering
 try:
     QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -29,6 +34,10 @@ try:
     user32 = ctypes.windll.user32
     gdi32 = ctypes.windll.gdi32
     shell32 = ctypes.windll.shell32
+    kernel32 = ctypes.windll.kernel32
+
+    class LASTINPUTINFO(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
 
     if hasattr(user32, "SetWindowLongPtrW"):
         SetWindowLongPtr = user32.SetWindowLongPtrW
@@ -150,6 +159,13 @@ class ClaudeTaskbarWidget(QWidget):
         self.idle_animations_enabled = True
         self.auto_hide_fullscreen = False
 
+        # Smart Context state (Claude Code live coding, AFK sleep, IDE focus)
+        self.smart_context_enabled = True
+        self.is_claude_coding = False
+        self.is_sleeping_afk = False
+        self._last_coding_time = 0.0
+        self._current_coding_project = ""
+
         # State
         self.current_anim_name = "idle"
         self.current_frame_idx = 0
@@ -199,6 +215,11 @@ class ClaudeTaskbarWidget(QWidget):
         self.fullscreen_timer.timeout.connect(self._check_fullscreen)
         if self.auto_hide_fullscreen:
             self.fullscreen_timer.start(800)
+
+        # Smart Context monitor timer (polls Claude Code & input every 1 second)
+        self.context_timer = QTimer(self)
+        self.context_timer.timeout.connect(self._check_contextual_state)
+        self.context_timer.start(1000)
 
         # Initial frame
         self.play_idle()
@@ -578,8 +599,13 @@ class ClaudeTaskbarWidget(QWidget):
                     self.on_anim_finished = None
                     cb()
                 else:
-                    self.play_idle()
-                    self._schedule_next_idle(10000, 25000)
+                    if self.smart_context_enabled and self.is_claude_coding:
+                        self.play_animation("typing", loop=True, speed_ms=110)
+                    elif self.smart_context_enabled and self.is_sleeping_afk:
+                        self.play_animation("sleep", loop=True, speed_ms=200)
+                    else:
+                        self.play_idle()
+                        self._schedule_next_idle(10000, 25000)
 
     def _schedule_next_idle(self, min_ms=10000, max_ms=25000):
         if self.idle_animations_enabled:
@@ -590,22 +616,38 @@ class ClaudeTaskbarWidget(QWidget):
     def _trigger_random_idle_action(self):
         if not self.idle_animations_enabled or self.is_dragging or getattr(self, "is_lifted", False) or self.hidden_by_fullscreen:
             return
+        if self.smart_context_enabled and (self.is_claude_coding or self.is_sleeping_afk):
+            return
         if self.current_anim_name != "idle":
             self._schedule_next_idle(8000, 15000)
             return
 
-        choices = [
-            ("blink", 30),
-            ("look_around", 15),
-            ("coffee", 8),
-            ("spark", 8),
-            ("chat", 7),
-            ("idea", 6),
-            ("typing", 6),
-            ("peek", 4),
-            ("matrix", 4),
-            ("shield", 3),
-        ]
+        # Adaptive idle: when user is working in IDE/Terminal, favor developer-themed animations
+        is_dev = self.smart_context_enabled and self._is_dev_window_active()
+        if is_dev:
+            choices = [
+                ("blink", 16),
+                ("look_around", 12),
+                ("matrix", 16),
+                ("wizard", 15),
+                ("spark", 15),
+                ("idea", 14),
+                ("coffee", 12),
+            ]
+        else:
+            choices = [
+                ("blink", 30),
+                ("look_around", 18),
+                ("coffee", 10),
+                ("spark", 10),
+                ("chat", 10),
+                ("idea", 8),
+                ("peek", 7),
+                ("matrix", 5),
+                ("shield", 2),
+            ]
+        # Notice: typing is completely excluded from random pool! It ONLY triggers when real Claude Code is coding.
+
         total = sum(w for _, w in choices)
         r = random.randint(1, total)
         accum = 0
@@ -619,8 +661,6 @@ class ClaudeTaskbarWidget(QWidget):
         speed = 130
         if selected == "blink":
             speed = 90
-        elif selected == "typing":
-            speed = 110
         elif selected == "matrix":
             speed = 120
 
@@ -628,6 +668,11 @@ class ClaudeTaskbarWidget(QWidget):
 
     def trigger_click_reaction(self):
         """Random playful reaction when user clicks on Claude."""
+        if self.is_sleeping_afk:
+            self.is_sleeping_afk = False
+            self.setToolTip("Claude Mascot")
+            self.play_animation("wave", loop=False, speed_ms=110, on_finished=self.play_idle)
+            return
         reactions = [
             ("wave", 110),
             ("cheer", 120),
@@ -766,6 +811,7 @@ class ClaudeTaskbarWidget(QWidget):
                     self.snap_to_taskbar = data.get("snap_to_taskbar", True)
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
                     self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", False)
+                    self.smart_context_enabled = data.get("smart_context_enabled", True)
                     if "x" in data and "y" in data:
                         self.saved_pos = QPoint(data["x"], data["y"])
             except Exception as e:
@@ -801,7 +847,8 @@ class ClaudeTaskbarWidget(QWidget):
                 "auto_peek_on_shell": self.auto_peek_on_shell,
                 "snap_to_taskbar": self.snap_to_taskbar,
                 "idle_animations_enabled": self.idle_animations_enabled,
-                "auto_hide_fullscreen": self.auto_hide_fullscreen
+                "auto_hide_fullscreen": self.auto_hide_fullscreen,
+                "smart_context_enabled": self.smart_context_enabled
             }
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -849,6 +896,205 @@ class ClaudeTaskbarWidget(QWidget):
             self.assert_topmost()
 
         self.save_config()
+
+
+    # --- Smart Context Logic (Claude Code, AFK Sleep, IDE Focus) ---
+
+    def _poll_claude_code(self):
+        """
+        Polls for active coding in Claude Code.
+        Returns: (is_coding: bool, project_name: str)
+        """
+        claude_dir = os.path.expanduser("~/.claude")
+        sessions_dir = os.path.join(claude_dir, "sessions")
+        if not os.path.exists(sessions_dir):
+            return False, ""
+
+        active_project = ""
+        now = time.time()
+
+        # 1. Primary signal: Active session status in ~/.claude/sessions/*.json
+        try:
+            for fname in os.listdir(sessions_dir):
+                if not fname.endswith(".json"):
+                    continue
+                fpath = os.path.join(sessions_dir, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    pid = data.get("pid")
+                    status = data.get("status")
+                    cwd = data.get("cwd", "")
+
+                    is_alive = False
+                    if pid:
+                        if psutil:
+                            is_alive = psutil.pid_exists(pid)
+                        elif user32:
+                            h_proc = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+                            if h_proc:
+                                ctypes.windll.kernel32.CloseHandle(h_proc)
+                                is_alive = True
+
+                    if is_alive:
+                        proj = os.path.basename(cwd) if cwd else ""
+                        if proj:
+                            active_project = proj
+                        if status == "busy":
+                            return True, proj
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        # 2. Secondary signal: recent writes to project .jsonl transcripts (last 3.5s)
+        projects_dir = os.path.join(claude_dir, "projects")
+        try:
+            if os.path.exists(projects_dir):
+                for proj in os.listdir(projects_dir):
+                    proj_path = os.path.join(projects_dir, proj)
+                    if not os.path.isdir(proj_path):
+                        continue
+                    for item in os.listdir(proj_path):
+                        if item.endswith(".jsonl"):
+                            p = os.path.join(proj_path, item)
+                            try:
+                                if (now - os.path.getmtime(p)) < 3.5:
+                                    clean_proj = proj.replace("U--", "").replace("C--", "").split("--")[-1]
+                                    return True, clean_proj or active_project
+                            except OSError:
+                                pass
+        except Exception:
+            pass
+
+        return False, active_project
+
+    def _get_user_idle_seconds(self) -> float:
+        """Returns number of seconds since last user input (mouse/keyboard)."""
+        if not user32 or not kernel32:
+            return 0.0
+        try:
+            lii = LASTINPUTINFO()
+            lii.cbSize = ctypes.sizeof(LASTINPUTINFO)
+            if user32.GetLastInputInfo(ctypes.byref(lii)):
+                tick_now = kernel32.GetTickCount()
+                diff = tick_now - lii.dwTime
+                if diff >= 0:
+                    return diff / 1000.0
+        except Exception:
+            pass
+        return 0.0
+
+    def _is_dev_window_active(self) -> bool:
+        """Checks if the user currently has an IDE, editor, or terminal active in foreground."""
+        if not user32:
+            return False
+        try:
+            hwnd = user32.GetForegroundWindow()
+            if not hwnd:
+                return False
+
+            length = user32.GetWindowTextLengthW(hwnd)
+            if length > 0:
+                buff = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(hwnd, buff, length + 1)
+                title = buff.value.lower()
+                dev_keywords = (
+                    "visual studio", "cursor", "pycharm", "intellij", "webstorm",
+                    "terminal", "powershell", "cmd.exe", "bash", "sublime", "neovim",
+                    "antigravity", "claude code", "workspace"
+                )
+                if any(kw in title for kw in dev_keywords):
+                    return True
+
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value and psutil:
+                try:
+                    proc_name = psutil.Process(pid.value).name().lower()
+                    dev_procs = (
+                        "code.exe", "cursor.exe", "pycharm64.exe", "idea64.exe",
+                        "windowsterminal.exe", "powershell.exe", "cmd.exe", "devenv.exe",
+                        "antigravity.exe", "webstorm64.exe", "wt.exe", "claude.exe"
+                    )
+                    if proc_name in dev_procs:
+                        return True
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return False
+
+    def _check_contextual_state(self):
+        """Called every 1 second by context_timer to check Claude Code, AFK sleep, etc."""
+        if not self.smart_context_enabled:
+            return
+        if self.is_dragging or getattr(self, "is_lifted", False) or self.hidden_by_fullscreen:
+            return
+
+        now = time.time()
+
+        # --- 1. Claude Code Detection (Highest Priority) ---
+        raw_coding, project_name = self._poll_claude_code()
+        if raw_coding:
+            self._last_coding_time = now
+            if project_name:
+                self._current_coding_project = project_name
+
+        # Hold coding state for 2.5s between rapid tool calls to prevent flapping
+        is_coding = raw_coding or (self.is_claude_coding and (now - self._last_coding_time < 2.5))
+
+        if is_coding and not self.is_claude_coding:
+            # Transition: Claude Code started generating/writing code!
+            self.is_claude_coding = True
+            self.is_sleeping_afk = False
+            self.idle_timer.stop()
+            proj_label = f" ({self._current_coding_project})" if self._current_coding_project else ""
+            self.setToolTip(f"Claude Mascot — 💻 Пишет код{proj_label}")
+            self.play_animation("typing", loop=True, speed_ms=110)
+            return
+
+        elif not is_coding and self.is_claude_coding:
+            # Transition: Claude Code finished coding!
+            self.is_claude_coding = False
+            self.setToolTip("Claude Mascot — ✨ Код готов!")
+            # Victory celebration requested by user: cheer or spark
+            celebration = random.choice(["cheer", "spark"])
+            def on_celebration_done():
+                self.setToolTip("Claude Mascot")
+                self.play_idle()
+                self._schedule_next_idle(8000, 20000)
+            self.play_animation(celebration, loop=False, speed_ms=120, on_finished=on_celebration_done)
+            return
+
+        if self.is_claude_coding:
+            return
+
+        # --- 2. AFK Inactivity Check (5 minutes = 300 seconds) ---
+        afk_seconds = self._get_user_idle_seconds()
+        AFK_THRESHOLD = 300  # 5 minutes
+
+        if afk_seconds >= AFK_THRESHOLD and not self.is_sleeping_afk:
+            # User has stepped away: Claude curls up to sleep
+            self.is_sleeping_afk = True
+            self.idle_timer.stop()
+            self.setToolTip("Claude Mascot — 💤 Спит (AFK)")
+            self.play_animation("sleep", loop=True, speed_ms=200)
+            return
+
+        elif afk_seconds < 2.0 and self.is_sleeping_afk:
+            # User returned to PC: Claude wakes up and greets!
+            self.is_sleeping_afk = False
+            self.setToolTip("Claude Mascot")
+            wake_reaction = random.choice(["wave", "look_around"])
+            def on_wake_done():
+                self.play_idle()
+                self._schedule_next_idle(6000, 18000)
+            self.play_animation(wake_reaction, loop=False, speed_ms=120, on_finished=on_wake_done)
+            return
+
+        if self.is_sleeping_afk:
+            return
 
     # --- Mouse Events: Free Dragging & Reactions ---
 
@@ -939,7 +1185,12 @@ class ClaudeTaskbarWidget(QWidget):
 
                 # Squish landing upon touchdown, then transition smoothly to idle!
                 self.play_animation("land", loop=False, speed_ms=100)
-                QTimer.singleShot(220, self.play_idle)
+                def on_after_land():
+                    if self.smart_context_enabled and self.is_claude_coding:
+                        self.play_animation("typing", loop=True, speed_ms=110)
+                    else:
+                        self.play_idle()
+                QTimer.singleShot(220, on_after_land)
             else:
                 delta = event.globalPosition().toPoint() - self.drag_start_pos if self.drag_start_pos else QPoint(0, 0)
                 if delta.manhattanLength() < 6:
@@ -1082,6 +1333,10 @@ class ClaudeTaskbarWidget(QWidget):
 
         menu.addSeparator()
 
+        # Smart Context toggle
+        smart_act = menu.addAction(f"{'✓ ' if self.smart_context_enabled else '   '}🧠 Умный контекст (Claude Code / AFK / IDE)")
+        smart_act.triggered.connect(self.toggle_smart_context)
+
         # Idle mode toggle
         idle_act = menu.addAction(f"{'✓ ' if self.idle_animations_enabled else '   '}Живой режим (авто-анимации)")
         idle_act.triggered.connect(self.toggle_idle_mode)
@@ -1170,6 +1425,16 @@ class ClaudeTaskbarWidget(QWidget):
             self.unembed_from_taskbar()
 
         self.save_config()
+
+    def toggle_smart_context(self):
+        self.smart_context_enabled = not self.smart_context_enabled
+        self.save_config()
+        if not self.smart_context_enabled:
+            self.is_claude_coding = False
+            self.is_sleeping_afk = False
+            self.setToolTip("Claude Mascot")
+            self.play_idle()
+            self._schedule_next_idle(8000, 20000)
 
     def toggle_auto_peek(self):
         self.auto_peek_on_shell = not self.auto_peek_on_shell
