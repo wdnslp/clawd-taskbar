@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>💻 Новые Анимации Ноутбука & Баланс Случайностей | Claude Taskbar Mascot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0c10;
+      --card-bg: rgba(22, 27, 34, 0.85);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --primary: #da7758;
+      --primary-light: #f38d6f;
+      --primary-glow: rgba(218, 119, 88, 0.35);
+      --cyan: #50dcf0;
+      --green: #28dc3c;
+      --purple: #a550e6;
+      --yellow: #ffd700;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --text-dim: #6e7681;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-dark);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(218, 119, 88, 0.15), transparent),
+        radial-gradient(circle at 80% 80%, rgba(40, 220, 60, 0.05), transparent);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 36px 20px 60px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 32px;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-icon {
+      width: 56px;
+      height: 56px;
+      background: rgba(218, 119, 88, 0.15);
+      border: 1px solid var(--primary-glow);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      image-rendering: pixelated;
+    }
+    .brand-icon img {
+      width: 44px;
+      height: 44px;
+      image-rendering: pixelated;
+    }
+
+    .brand-titles h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 0%, #da7758 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-titles p {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 12px;
+    }
+    .btn-link {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--primary);
+      color: var(--primary-light);
+    }
+
+    /* EXPLANATION BANNER */
+    .info-banner {
+      background: rgba(22, 27, 34, 0.95);
+      border: 1px solid rgba(80, 220, 240, 0.3);
+      border-radius: 14px;
+      padding: 22px 26px;
+      margin-bottom: 36px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 800px) {
+      .info-banner { grid-template-columns: 1fr; }
+    }
+    .info-banner h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .info-banner p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+    .info-banner b {
+      color: var(--text-main);
+    }
+    .info-banner ul {
+      margin-left: 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    /* SECTION TITLE */
+    .section-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* GRID OF LAPTOP ANIMATIONS */
+    .laptop-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .laptop-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+    }
+    .laptop-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--primary);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 20px var(--primary-glow);
+    }
+
+    .badge-card {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+    .badge-classic { background: rgba(80, 220, 240, 0.15); color: var(--cyan); border: 1px solid rgba(80, 220, 240, 0.3); }
+    .badge-hack { background: rgba(40, 220, 60, 0.15); color: var(--green); border: 1px solid rgba(40, 220, 60, 0.3); }
+    .badge-think { background: rgba(255, 215, 0, 0.15); color: var(--yellow); border: 1px solid rgba(255, 215, 0, 0.3); }
+    .badge-coffee { background: rgba(218, 119, 88, 0.15); color: var(--primary-light); border: 1px solid rgba(218, 119, 88, 0.3); }
+
+    .mascot-stage {
+      width: 140px;
+      height: 140px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, rgba(0,0,0,0.3) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .mascot-stage canvas {
+      width: 96px;
+      height: 96px;
+      image-rendering: pixelated;
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-tagline {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+      min-height: 54px;
+    }
+
+    .frame-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 10px;
+      border-radius: 12px;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+
+    .controls-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: auto;
+    }
+    .btn-ctrl {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-ctrl:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--primary);
+    }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-dim);
+      padding-top: 30px;
+      border-top: 1px solid var(--card-border);
+      margin-top: 40px;
+    }
+    footer a { color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- HEADER -->
+    <header>
+      <div class="brand-wrap">
+        <div class="brand-icon">
+          <img src="base.png" alt="Claude">
+        </div>
+        <div class="brand-titles">
+          <h1>Новые Анимации Ноутбука & Умный Баланс</h1>
+          <p>4 уникальных стиля работы за ноутбуком + перебалансировка случайных событий</p>
+        </div>
+      </div>
+      <div class="nav-links">
+        <a href="showcase.html" class="btn-link btn-outline">🎭 Полная Галерея (24+)</a>
+        <a href="drag_preview.html" class="btn-link btn-outline">🏃 Поднятие (Drag)</a>
+      </div>
+    </header>
+
+    <!-- EXPLANATION BANNER -->
+    <div class="info-banner">
+      <div>
+        <h3>❓ Почему раньше не выпадала «Матрица» и другие?</h3>
+        <p>Раньше в коде стоял сильный перекос вероятностей:</p>
+        <ul>
+          <li><b>😉 Моргание (Blink)</b> занимало <b>33%</b> всех шансов!</li>
+          <li><b>👀 Оглядеться</b> забирало ещё <b>20%</b>.</li>
+          <li><b>🟢 Матрица (Matrix)</b> имела шанс всего <b>5%</b> (раз в 10 минут).</li>
+          <li><b>🧙 Волшебник, 🏋️ Штанга, 💃 Танец, 🦘 Прыжок</b> вообще не были включены в случайный фоновый пул!</li>
+        </ul>
+      </div>
+      <div>
+        <h3>✨ Что сделано сейчас (Умный Баланс & Anti-Repeat):</h3>
+        <p>Мы полностью переработали генератор случайных событий:</p>
+        <ul>
+          <li><b>🚫 Защита от повторов:</b> Клод запоминает 4 последние анимации и никогда не повторит их подряд!</li>
+          <li><b>⚖️ Равномерные шансы:</b> Матрица, Волшебник, Штанга, Идея, Искра, Кофе и Танец теперь имеют высокий равный шанс.</li>
+          <li><b>⏱ Частота анимаций:</b> в меню добавлен переключатель скорости: <i>Частый (6-12 сек)</i> / <i>Обычный (12-22 сек)</i> / <i>Спокойный (25-50 сек)</i>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SECTION TITLE -->
+    <h2 class="section-title">💻 4 Стиля Работы за Ноутбуком</h2>
+    <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 24px;">
+      Во время работы <b>Claude Code</b> виджет не просто крутит одну анимацию, а <b>динамично чередует стили</b> каждые 12 секунд! Вы также можете включить любой стиль вручную через правый клик → <i>«Ноутбук и Кодинг»</i>.
+    </p>
+
+    <!-- LAPTOP ANIMATIONS GRID -->
+    <div class="laptop-grid" id="laptopGrid"></div>
+
+    <footer>
+      <p>Claude Pixel Taskbar Mascot • Каноничные 16x16 спрайты без рта • Windows 11 Taskbar Integration</p>
+      <p style="margin-top: 6px;"><a href="showcase.html">← Вернуться в общую галерею всех анимаций</a></p>
+    </footer>
+  </div>
+
+  <script>
+    const LAPTOP_ANIMATIONS = [
+      {
+        id: "typing",
+        title: "💻 Классический Кодинг",
+        badge: "БИЛД & КОМПИЛЯЦИЯ",
+        badgeClass: "badge-classic",
+        tagline: "Длинная богатая сессия: включение экрана, печать обеими лапками, компиляция с жёлтым бликом и зелёный экран успешного билда с румянцем!",
+        speed: 110,
+        frames: 12
+      },
+      {
+        id: "laptop_hack",
+        title: "⚡ Турбо-Матричный Хакинг",
+        badge: "ТУРБО / СКОРОСТЬ",
+        badgeClass: "badge-hack",
+        tagline: "Бешеный темп печати: зелёный матричный терминал, искры скорости от клавиш (85ms!), кибер-блик на макушке. Режим максимальной концентрации!",
+        speed: 85,
+        frames: 4
+      },
+      {
+        id: "laptop_think",
+        title: "🧠 Поиск Бага & Эврика!",
+        badge: "ПОИСК РЕШЕНИЯ",
+        badgeClass: "badge-think",
+        tagline: "Клод чешет подбородок 2x2 лапкой, задумчиво смотрит в потолок, затем над головой вспыхивает золотая лампочка идеи (💡), Enter — и баг исправлен!",
+        speed: 130,
+        frames: 6
+      },
+      {
+        id: "laptop_coffee",
+        title: "☕ Кодинг с Глотком Кофе",
+        badge: "УЮТ & ТОПЛИВО",
+        badgeClass: "badge-coffee",
+        tagline: "Рядом с ноутбуком стоит кружечка с тёплым паром. Клод кодит, делает паузу, берёт кружку, делает глоток, довольно жмурится и продолжает писать код!",
+        speed: 130,
+        frames: 5
+      }
+    ];
+
+    const players = {};
+
+    function initShowcase() {
+      const grid = document.getElementById("laptopGrid");
+
+      LAPTOP_ANIMATIONS.forEach(anim => {
+        const card = document.createElement("div");
+        card.className = "laptop-card";
+
+        card.innerHTML = `
+          <span class="badge-card ${anim.badgeClass}">${anim.badge}</span>
+          <div class="mascot-stage">
+            <canvas id="canvas_${anim.id}" width="16" height="16"></canvas>
+          </div>
+          <div class="card-title">${anim.title}</div>
+          <div class="card-tagline">${anim.tagline}</div>
+          <div class="frame-pill" id="pill_${anim.id}">${anim.frames} кадров • ${anim.speed}ms</div>
+          <div class="controls-row">
+            <button class="btn-ctrl" onclick="togglePlay('${anim.id}')" id="btn_${anim.id}">⏸ Пауза</button>
+            <button class="btn-ctrl" onclick="stepFrame('${anim.id}')">⏭ Кадр</button>
+          </div>
+        `;
+
+        grid.appendChild(card);
+
+        // Setup Player
+        const canvas = document.getElementById(`canvas_${anim.id}`);
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+
+        const imgs = [];
+        for (let i = 0; i < anim.frames; i++) {
+          const img = new Image();
+          img.src = `animations/${anim.id}_${String(i).padStart(2, '0')}.png`;
+          imgs.push(img);
+        }
+
+        players[anim.id] = {
+          anim: anim,
+          ctx: ctx,
+          imgs: imgs,
+          frameIdx: 0,
+          isPlaying: true,
+          timer: null
+        };
+
+        startPlayer(anim.id);
+      });
+    }
+
+    function startPlayer(id) {
+      const p = players[id];
+      if (p.timer) clearInterval(p.timer);
+
+      p.timer = setInterval(() => {
+        if (!p.isPlaying) return;
+        renderPlayer(id);
+        p.frameIdx = (p.frameIdx + 1) % p.anim.frames;
+      }, p.anim.speed);
+    }
+
+    function renderPlayer(id) {
+      const p = players[id];
+      const img = p.imgs[p.frameIdx];
+      if (img && img.complete) {
+        p.ctx.clearRect(0, 0, 16, 16);
+        p.ctx.drawImage(img, 0, 0, 16, 16);
+        const pill = document.getElementById(`pill_${id}`);
+        if (pill) {
+          pill.innerText = `Кадр ${p.frameIdx + 1}/${p.anim.frames} • ${p.anim.speed}ms`;
+        }
+      }
+    }
+
+    function togglePlay(id) {
+      const p = players[id];
+      p.isPlaying = !p.isPlaying;
+      const btn = document.getElementById(`btn_${id}`);
+      btn.innerText = p.isPlaying ? "⏸ Пауза" : "▶ Старт";
+    }
+
+    function stepFrame(id) {
+      const p = players[id];
+      p.isPlaying = false;
+      document.getElementById(`btn_${id}`).innerText = "▶ Старт";
+      p.frameIdx = (p.frameIdx + 1) % p.anim.frames;
+      renderPlayer(id);
+    }
+
+    window.addEventListener("DOMContentLoaded", initShowcase);
+  </script>
+</body>
+</html>

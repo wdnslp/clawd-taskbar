@@ -165,6 +165,10 @@ class ClaudeTaskbarWidget(QWidget):
         self.is_sleeping_afk = False
         self._last_coding_time = 0.0
         self._current_coding_project = ""
+        self._current_coding_project = ""
+        self._recent_idle_history = []
+        self.idle_frequency_mode = "normal"  # "active" (6-12s), "normal" (12-22s), "relaxed" (25-50s)
+        self._current_laptop_anim_idx = 0
 
         # State
         self.current_anim_name = "idle"
@@ -607,11 +611,19 @@ class ClaudeTaskbarWidget(QWidget):
                         self.play_idle()
                         self._schedule_next_idle(10000, 25000)
 
-    def _schedule_next_idle(self, min_ms=10000, max_ms=25000):
-        if self.idle_animations_enabled:
-            interval = random.randint(min_ms, max_ms)
-            self.idle_timer.stop()
-            self.idle_timer.start(interval)
+    def _schedule_next_idle(self, min_ms=None, max_ms=None):
+        if not self.idle_animations_enabled:
+            return
+        if min_ms is None or max_ms is None:
+            if self.idle_frequency_mode == "active":
+                min_ms, max_ms = 6000, 12000
+            elif self.idle_frequency_mode == "relaxed":
+                min_ms, max_ms = 25000, 50000
+            else:  # normal
+                min_ms, max_ms = 12000, 22000
+        interval = random.randint(min_ms, max_ms)
+        self.idle_timer.stop()
+        self.idle_timer.start(interval)
 
     def _trigger_random_idle_action(self):
         if not self.idle_animations_enabled or self.is_dragging or getattr(self, "is_lifted", False) or self.hidden_by_fullscreen:
@@ -619,51 +631,86 @@ class ClaudeTaskbarWidget(QWidget):
         if self.smart_context_enabled and (self.is_claude_coding or self.is_sleeping_afk):
             return
         if self.current_anim_name != "idle":
-            self._schedule_next_idle(8000, 15000)
+            self._schedule_next_idle()
             return
 
-        # Adaptive idle: when user is working in IDE/Terminal, favor developer-themed animations
+        # Rich, balanced pool with ALL animations!
+        # Notice: Laptop coding animations (typing, laptop_*) are excluded from random pool:
+        # they strictly trigger when real Claude Code is coding!
         is_dev = self.smart_context_enabled and self._is_dev_window_active()
         if is_dev:
-            choices = [
-                ("blink", 16),
-                ("look_around", 12),
-                ("matrix", 16),
-                ("wizard", 15),
-                ("spark", 15),
-                ("idea", 14),
-                ("coffee", 12),
+            # Active in IDE/Terminal: high chance for matrix, wizard, idea, spark
+            all_choices = [
+                ("matrix", 20),
+                ("wizard", 18),
+                ("spark", 16),
+                ("idea", 16),
+                ("coffee", 14),
+                ("workout", 10),
+                ("dance", 8),
+                ("look_around", 8),
+                ("blink", 8),
+                ("shield", 6),
             ]
         else:
-            choices = [
-                ("blink", 30),
-                ("look_around", 18),
+            # Cozy desktop pool: high variety, equalized chances, NO boring blink domination
+            all_choices = [
+                ("matrix", 12),
+                ("wizard", 12),
+                ("workout", 10),
                 ("coffee", 10),
                 ("spark", 10),
+                ("idea", 10),
+                ("dance", 10),
                 ("chat", 10),
-                ("idea", 8),
-                ("peek", 7),
-                ("matrix", 5),
-                ("shield", 2),
+                ("look_around", 10),
+                ("blink", 8),
+                ("peek", 8),
+                ("jump", 8),
+                ("heart", 8),
+                ("shield", 6),
+                ("question", 6),
             ]
-        # Notice: typing is completely excluded from random pool! It ONLY triggers when real Claude Code is coding.
 
-        total = sum(w for _, w in choices)
+        # Anti-repeat filter: exclude animations played in the last 4 rounds for maximum fresh variety!
+        eligible = [(name, w) for name, w in all_choices if name not in self._recent_idle_history]
+        if not eligible:
+            eligible = all_choices
+
+        total = sum(w for _, w in eligible)
         r = random.randint(1, total)
         accum = 0
-        selected = "blink"
-        for name, weight in choices:
+        selected = eligible[0][0]
+        for name, weight in eligible:
             accum += weight
             if r <= accum:
                 selected = name
                 break
 
-        speed = 130
-        if selected == "blink":
-            speed = 90
-        elif selected == "matrix":
-            speed = 120
+        # Update recent history
+        self._recent_idle_history.append(selected)
+        if len(self._recent_idle_history) > 4:
+            self._recent_idle_history.pop(0)
 
+        # Precise speed per animation
+        speeds = {
+            "blink": 90,
+            "matrix": 110,
+            "wizard": 120,
+            "workout": 110,
+            "dance": 120,
+            "jump": 100,
+            "heart": 130,
+            "coffee": 130,
+            "idea": 120,
+            "spark": 110,
+            "chat": 120,
+            "peek": 120,
+            "shield": 120,
+            "look_around": 130,
+            "question": 130,
+        }
+        speed = speeds.get(selected, 120)
         self.play_animation(selected, loop=False, speed_ms=speed)
 
     def trigger_click_reaction(self):
@@ -812,6 +859,7 @@ class ClaudeTaskbarWidget(QWidget):
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
                     self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", False)
                     self.smart_context_enabled = data.get("smart_context_enabled", True)
+                    self.idle_frequency_mode = data.get("idle_frequency_mode", "normal")
                     if "x" in data and "y" in data:
                         self.saved_pos = QPoint(data["x"], data["y"])
             except Exception as e:
@@ -848,7 +896,8 @@ class ClaudeTaskbarWidget(QWidget):
                 "snap_to_taskbar": self.snap_to_taskbar,
                 "idle_animations_enabled": self.idle_animations_enabled,
                 "auto_hide_fullscreen": self.auto_hide_fullscreen,
-                "smart_context_enabled": self.smart_context_enabled
+                "smart_context_enabled": self.smart_context_enabled,
+                "idle_frequency_mode": self.idle_frequency_mode
             }
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -899,6 +948,18 @@ class ClaudeTaskbarWidget(QWidget):
 
 
     # --- Smart Context Logic (Claude Code, AFK Sleep, IDE Focus) ---
+
+    LAPTOP_ANIMATIONS = [
+        ("typing", 110),         # Classic long coding session
+        ("laptop_hack", 85),      # Turbo matrix speed hacking
+        ("laptop_think", 130),    # Bug hunting & Eureka idea
+        ("laptop_coffee", 130),   # Coding with cozy coffee sip
+    ]
+
+    def _pick_next_laptop_anim(self):
+        anim, spd = self.LAPTOP_ANIMATIONS[self._current_laptop_anim_idx % len(self.LAPTOP_ANIMATIONS)]
+        self._current_laptop_anim_idx += 1
+        return anim, spd
 
     def _poll_claude_code(self):
         """
@@ -1051,7 +1112,8 @@ class ClaudeTaskbarWidget(QWidget):
             self.idle_timer.stop()
             proj_label = f" ({self._current_coding_project})" if self._current_coding_project else ""
             self.setToolTip(f"Claude Mascot — 💻 Пишет код{proj_label}")
-            self.play_animation("typing", loop=True, speed_ms=110)
+            anim, spd = self._pick_next_laptop_anim()
+            self.play_animation(anim, loop=True, speed_ms=spd)
             return
 
         elif not is_coding and self.is_claude_coding:
@@ -1067,7 +1129,15 @@ class ClaudeTaskbarWidget(QWidget):
             self.play_animation(celebration, loop=False, speed_ms=120, on_finished=on_celebration_done)
             return
 
+        # If currently busy writing code with Claude Code, periodically cycle laptop animations!
         if self.is_claude_coding:
+            if hasattr(self, "_last_laptop_switch_time"):
+                if now - self._last_laptop_switch_time > 12.0:
+                    self._last_laptop_switch_time = now
+                    anim, spd = self._pick_next_laptop_anim()
+                    self.play_animation(anim, loop=True, speed_ms=spd)
+            else:
+                self._last_laptop_switch_time = now
             return
 
         # --- 2. AFK Inactivity Check (5 minutes = 300 seconds) ---
@@ -1293,10 +1363,15 @@ class ClaudeTaskbarWidget(QWidget):
                 ("🛡️ Защитный купол (Shield)", "shield", 120, False),
                 ("🟢 Матрица / Хакер (Matrix)", "matrix", 120, True),
             ]),
-            ("💻 Работа и отдых", [
-                ("💻 Кодить за ноутбуком (Typing)", "typing", 110, True),
+            ("💻 Ноутбук и Кодинг (4 стиля)", [
+                ("💻 Классический кодинг (Typing)", "typing", 110, True),
+                ("⚡ Турбо-хакинг матрицы (Hack)", "laptop_hack", 85, True),
+                ("🧠 Поиск бага и Эврика (Think)", "laptop_think", 130, True),
+                ("☕ Кодинг с глотком кофе (Coffee)", "laptop_coffee", 130, True),
+            ]),
+            ("☕ Отдых и вдохновение", [
                 ("💡 Осенила идея (Idea)", "idea", 120, False),
-                ("☕ Чашка кофе (Coffee)", "coffee", 140, False),
+                ("☕ Чашка кофе (Coffee)", "coffee", 130, False),
             ]),
             ("😊 Эмоции и жесты", [
                 ("👋 Помахать рукой (Wave)", "wave", 110, False),
@@ -1340,6 +1415,18 @@ class ClaudeTaskbarWidget(QWidget):
         # Idle mode toggle
         idle_act = menu.addAction(f"{'✓ ' if self.idle_animations_enabled else '   '}Живой режим (авто-анимации)")
         idle_act.triggered.connect(self.toggle_idle_mode)
+
+        # Idle frequency submenu
+        freq_menu = menu.addMenu("⏱ Частота анимаций")
+        freq_opts = [
+            ("⚡ Частый (каждые 6-12 сек)", "active"),
+            ("⏱ Обычный (каждые 12-22 сек)", "normal"),
+            ("🧘 Спокойный (каждые 25-50 сек)", "relaxed"),
+        ]
+        for title, mode in freq_opts:
+            is_active = (self.idle_frequency_mode == mode)
+            act = freq_menu.addAction(f"{'● ' if is_active else '   '}{title}")
+            act.triggered.connect(lambda checked=False, m=mode: self.set_idle_frequency(m))
 
         # Fullscreen auto-hide toggle
         fs_act = menu.addAction(f"{'✓ ' if self.auto_hide_fullscreen else '   '}Скрывать в полноэкранных играх")
@@ -1425,6 +1512,11 @@ class ClaudeTaskbarWidget(QWidget):
             self.unembed_from_taskbar()
 
         self.save_config()
+
+    def set_idle_frequency(self, mode):
+        self.idle_frequency_mode = mode
+        self.save_config()
+        self._schedule_next_idle()
 
     def toggle_smart_context(self):
         self.smart_context_enabled = not self.smart_context_enabled
