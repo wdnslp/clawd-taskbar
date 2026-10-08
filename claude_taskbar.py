@@ -238,15 +238,22 @@ class RoamZoneOverlayWidget(QWidget):
         self.claude_widget.ensure_roam_bounds()
         min_x = max(tray_left, self.claude_widget.roam_screen_min_x)
         max_x = min(tray_left + tray_w, self.claude_widget.roam_screen_max_x)
-        w = max(120, max_x - min_x)
+        self.zone_w = max(120, max_x - min_x)
+        self.zone_h = tray_h
 
-        self.setGeometry(min_x, tray_top, w, tray_h)
+        # Window covers blue zone on taskbar plus top/right offsets for the badge
+        offset_top = 10
+        offset_right = 12
+        self.setGeometry(min_x, tray_top - offset_top, self.zone_w + offset_right, self.zone_h + offset_top)
 
     def close_btn_rect(self):
-        btn_w, btn_h = 20, 20
-        btn_x = self.width() - btn_w - 6
-        btn_y = max(2, (self.height() - btn_h) // 2)
-        return QRect(btn_x, btn_y, btn_w, btn_h)
+        # Square badge in the top-right corner with fly-out
+        badge_size = 20
+        offset_top = 10
+        zone_w = getattr(self, "zone_w", self.width() - 12)
+        bx = zone_w - badge_size // 2 - 1
+        by = max(1, offset_top - badge_size // 2 - 1)
+        return QRect(bx, by, badge_size, badge_size)
 
     def is_over_close_btn(self, pt):
         return self.close_btn_rect().contains(pt)
@@ -271,16 +278,22 @@ class RoamZoneOverlayWidget(QWidget):
 
             self.drag_start_global_x = event.globalPosition().toPoint().x()
             self.drag_start_geo = self.geometry()
+            self.drag_start_zone_w = getattr(self, "zone_w", self.width() - 12)
 
             if pos.x() <= 14:
                 self.drag_mode = "left"
-            elif pos.x() >= self.width() - 14:
+            elif pos.x() >= self.drag_start_zone_w - 14:
                 self.drag_mode = "right"
             else:
                 self.drag_mode = "move"
 
     def mouseMoveEvent(self, event):
         pos = event.pos()
+        offset_top = 10
+        offset_right = 12
+        zone_w = getattr(self, "zone_w", self.width() - offset_right)
+        zone_h = getattr(self, "zone_h", self.height() - offset_top)
+
         if self.drag_mode is None:
             was_hover = self._hover_close
             now_hover = self.is_over_close_btn(pos)
@@ -290,7 +303,7 @@ class RoamZoneOverlayWidget(QWidget):
 
             if now_hover:
                 self.setCursor(Qt.CursorShape.PointingHandCursor)
-            elif pos.x() <= 14 or pos.x() >= self.width() - 14:
+            elif pos.x() <= 14 or pos.x() >= zone_w - 14:
                 self.setCursor(Qt.CursorShape.SizeHorCursor)
             else:
                 self.setCursor(Qt.CursorShape.SizeAllCursor)
@@ -303,37 +316,49 @@ class RoamZoneOverlayWidget(QWidget):
 
         if self.drag_mode == "move":
             new_x = self.drag_start_geo.x() + delta_x
-            new_x = max(tray_left, min(tray_right - self.drag_start_geo.width(), new_x))
+            new_x = max(tray_left, min(tray_right - zone_w, new_x))
             self.move(new_x, self.y())
 
         elif self.drag_mode == "left":
             new_x = self.drag_start_geo.x() + delta_x
-            new_w = self.drag_start_geo.width() - delta_x
+            new_w = self.drag_start_zone_w - delta_x
             if new_w >= 120 and new_x >= tray_left:
-                self.setGeometry(new_x, self.y(), new_w, self.height())
+                self.zone_w = new_w
+                self.setGeometry(new_x, self.y(), new_w + offset_right, zone_h + offset_top)
 
         elif self.drag_mode == "right":
-            new_w = self.drag_start_geo.width() + delta_x
+            new_w = self.drag_start_zone_w + delta_x
             if new_w >= 120 and (self.x() + new_w <= tray_right):
-                self.resize(new_w, self.height())
+                self.zone_w = new_w
+                self.resize(new_w + offset_right, zone_h + offset_top)
 
         self.claude_widget.roam_screen_min_x = self.x()
-        self.claude_widget.roam_screen_max_x = self.x() + self.width()
+        self.claude_widget.roam_screen_max_x = self.x() + getattr(self, "zone_w", self.width() - offset_right)
         self.update()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_mode = None
+            offset_right = 12
             self.claude_widget.roam_screen_min_x = self.x()
-            self.claude_widget.roam_screen_max_x = self.x() + self.width()
+            self.claude_widget.roam_screen_max_x = self.x() + getattr(self, "zone_w", self.width() - offset_right)
             self.claude_widget.save_config()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-        w = self.width()
-        h = self.height()
+        offset_top = 10
+        offset_right = 12
+        corner_radius = 4
+
+        zone_w = getattr(self, "zone_w", self.width() - offset_right)
+        zone_h = getattr(self, "zone_h", self.height() - offset_top)
+
+        zone_x = 1
+        zone_y = offset_top + 1
+        draw_w = zone_w - 2
+        draw_h = zone_h - 2
 
         # Exact sampled blue from screenshot: (35, 116, 222)
         fill_color = QColor(35, 116, 222, 95)
@@ -343,31 +368,44 @@ class RoamZoneOverlayWidget(QWidget):
         # Background fill and outline (clean, uncluttered box)
         painter.setBrush(fill_color)
         painter.setPen(QPen(border_color, 2))
-        painter.drawRoundedRect(1, 1, w - 2, h - 2, 4, 4)
+        painter.drawRoundedRect(zone_x, zone_y, draw_w, draw_h, corner_radius, corner_radius)
 
         # Left Handle Grip
         painter.setBrush(handle_color)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(2, 4, 10, h - 8, 3, 3)
+        painter.drawRoundedRect(zone_x + 2, zone_y + 3, 10, draw_h - 6, 3, 3)
         painter.setBrush(QColor(255, 255, 255, 200))
-        for dot_y in (h // 2 - 6, h // 2, h // 2 + 6):
-            painter.drawEllipse(6, dot_y, 2, 2)
+        for dot_y in (zone_y + draw_h // 2 - 6, zone_y + draw_h // 2, zone_y + draw_h // 2 + 6):
+            painter.drawEllipse(zone_x + 6, dot_y, 2, 2)
 
         # Right Handle Grip
         painter.setBrush(handle_color)
-        painter.drawRoundedRect(w - 12, 4, 10, h - 8, 3, 3)
+        painter.drawRoundedRect(zone_x + draw_w - 12, zone_y + 3, 10, draw_h - 6, 3, 3)
         painter.setBrush(QColor(255, 255, 255, 200))
-        for dot_y in (h // 2 - 6, h // 2, h // 2 + 6):
-            painter.drawEllipse(w - 8, dot_y, 2, 2)
+        for dot_y in (zone_y + draw_h // 2 - 6, zone_y + draw_h // 2, zone_y + draw_h // 2 + 6):
+            painter.drawEllipse(zone_x + draw_w - 8, dot_y, 2, 2)
 
-        # Material Symbols Outlined Close button (crisp, centered 14x14)
+        # Material Symbols Outlined Close Badge (Square with rounded corners, fly-out top-right)
         cr = self.close_btn_rect()
-        if self._hover_close:
-            painter.setBrush(QColor(255, 255, 255, 35))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(cr, 4, 4)
 
-        icon_size = 14
+        # Shadow
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(0, 0, 0, 80))
+        painter.drawRoundedRect(cr.translated(0, 1), corner_radius, corner_radius)
+
+        # Badge Body
+        if self._hover_close:
+            badge_bg = QColor(218, 119, 88, 245)      # Claude brand orange on hover
+            badge_border = QColor(255, 255, 255, 230)
+        else:
+            badge_bg = QColor(26, 32, 44, 240)        # Dark theme badge
+            badge_border = QColor(109, 167, 236, 240)  # Accent blue border
+
+        painter.setBrush(badge_bg)
+        painter.setPen(QPen(badge_border, 1.5))
+        painter.drawRoundedRect(cr, corner_radius, corner_radius)
+
+        icon_size = 12
         icon_x = cr.x() + (cr.width() - icon_size) / 2.0
         icon_y = cr.y() + (cr.height() - icon_size) / 2.0
         icon_r = QRectF(icon_x, icon_y, icon_size, icon_size)
@@ -1129,7 +1167,7 @@ class ClaudeTaskbarWidget(QWidget):
             try:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.scale_factor = data.get("scale_factor", 3)
+                    self.scale_factor = 3
                     self.placement_mode = data.get("placement_mode", "bottom")
                     self.auto_peek_on_shell = data.get("auto_peek_on_shell", False)
                     self.snap_to_taskbar = data.get("snap_to_taskbar", True)
@@ -1555,11 +1593,7 @@ class ClaudeTaskbarWidget(QWidget):
             self.play_animation(hype, loop=False, speed_ms=100)
 
     def wheelEvent(self, event):
-        delta = event.angleDelta().y()
-        if delta > 0:
-            self.set_scale(self.scale_factor + 1)
-        elif delta < 0:
-            self.set_scale(self.scale_factor - 1)
+        pass
 
     # --- Fullscreen Game Auto-Hide (Clean) ---
 
@@ -1823,23 +1857,7 @@ class ClaudeTaskbarWidget(QWidget):
 
         self.tray_menu.addSeparator()
 
-        # 3. Scale Submenu
-        scale_menu = self.tray_menu.addMenu("Размер")
-        scale_menu.setStyleSheet(menu_style)
-        scale_menu.setIcon(get_material_icon("size"))
-        scale_options = [
-            ("Мини (16px, 2x)", 2),
-            ("Обычный (24px, 3x)", 3),
-            ("Средний (32px, 4x)", 4),
-            ("Большой (40px, 5x)", 5),
-            ("Вся высота панели (48px, 6x)", 6),
-            ("Гигантский (64px, 8x)", 8),
-        ]
-        for title, factor in scale_options:
-            act = scale_menu.addAction(get_material_icon("check" if self.scale_factor == factor else "blank"), title)
-            act.triggered.connect(lambda checked=False, f=factor: self.set_scale(f))
-
-        # 4. Placement Submenu
+        # 3. Placement Submenu
         place_menu = self.tray_menu.addMenu("Позиция на панели")
         place_menu.setStyleSheet(menu_style)
         place_menu.setIcon(get_material_icon("position"))
