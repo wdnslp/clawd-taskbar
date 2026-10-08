@@ -8,7 +8,8 @@ import ctypes
 from ctypes import wintypes
 from PyQt6.QtWidgets import QApplication, QWidget, QMenu, QSystemTrayIcon
 from PyQt6.QtGui import QImage, QPixmap, QPainter, QCursor, QColor, QPen, QIcon
-from PyQt6.QtCore import Qt, QTimer, QPoint, QRect
+from PyQt6.QtCore import Qt, QTimer, QPoint, QRect, QRectF
+from PyQt6.QtSvg import QSvgRenderer
 import winreg
 
 try:
@@ -174,9 +175,10 @@ def set_autostart_configured(enabled: bool) -> bool:
 # --- Taskbar Roaming Zone Overlay (Draggable & Resizable Blue Interval) ---
 class RoamZoneOverlayWidget(QWidget):
     """
-    Semi-transparent blue interval overlay directly on the taskbar.
-    Color matches user screenshot: rgba(35, 116, 222, 0.38) with handles on left & right.
-    Users can drag the entire box or adjust its edges anywhere across the taskbar.
+    Clean, minimal semi-transparent blue interval overlay directly on the taskbar.
+    Color matches user screenshot: rgba(35, 116, 222, 0.38) with side handles.
+    Uses official Material Symbols Outlined 'close' icon.
+    No obstructive text or walking icons in the middle.
     """
     def __init__(self, claude_widget):
         super().__init__()
@@ -193,6 +195,14 @@ class RoamZoneOverlayWidget(QWidget):
         self.drag_mode = None  # None, "move", "left", "right"
         self.drag_start_global_x = 0
         self.drag_start_geo = None
+        self._hover_close = False
+
+        # Load Google Material Symbols Outlined 'close' icon
+        close_svg = os.path.join(BASE_DIR, "assets", "close.svg")
+        if os.path.exists(close_svg):
+            self.close_renderer = QSvgRenderer(close_svg)
+        else:
+            self.close_renderer = None
 
         self.sync_geometry()
 
@@ -218,19 +228,32 @@ class RoamZoneOverlayWidget(QWidget):
 
         self.setGeometry(min_x, tray_top, w, tray_h)
 
+    def close_btn_rect(self):
+        btn_w, btn_h = 20, 20
+        btn_x = self.width() - btn_w - 6
+        btn_y = max(2, (self.height() - btn_h) // 2)
+        return QRect(btn_x, btn_y, btn_w, btn_h)
+
     def is_over_close_btn(self, pt):
-        return pt.x() >= self.width() - 28 and pt.y() <= 24
+        return self.close_btn_rect().contains(pt)
+
+    def leaveEvent(self, event):
+        if self._hover_close:
+            self._hover_close = False
+            self.update()
+        super().leaveEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # Cancel any ongoing slow roaming step on Claude immediately
-            if hasattr(self.claude_widget, "_roam_step_timer") and self.claude_widget._roam_step_timer.isActive():
-                self.claude_widget._roam_step_timer.stop()
-                self.claude_widget._roam_steps_remaining = 0
             pos = event.pos()
             if self.is_over_close_btn(pos):
                 self.hide()
                 return
+
+            # Cancel any ongoing slow roaming step on Claude immediately
+            if hasattr(self.claude_widget, "_roam_step_timer") and self.claude_widget._roam_step_timer.isActive():
+                self.claude_widget._roam_step_timer.stop()
+                self.claude_widget._roam_steps_remaining = 0
 
             self.drag_start_global_x = event.globalPosition().toPoint().x()
             self.drag_start_geo = self.geometry()
@@ -245,7 +268,13 @@ class RoamZoneOverlayWidget(QWidget):
     def mouseMoveEvent(self, event):
         pos = event.pos()
         if self.drag_mode is None:
-            if self.is_over_close_btn(pos):
+            was_hover = self._hover_close
+            now_hover = self.is_over_close_btn(pos)
+            if was_hover != now_hover:
+                self._hover_close = now_hover
+                self.update()
+
+            if now_hover:
                 self.setCursor(Qt.CursorShape.PointingHandCursor)
             elif pos.x() <= 14 or pos.x() >= self.width() - 14:
                 self.setCursor(Qt.CursorShape.SizeHorCursor)
@@ -297,7 +326,7 @@ class RoamZoneOverlayWidget(QWidget):
         border_color = QColor(109, 167, 236, 230)
         handle_color = QColor(52, 135, 236, 240)
 
-        # Background fill and outline
+        # Background fill and outline (clean, uncluttered box)
         painter.setBrush(fill_color)
         painter.setPen(QPen(border_color, 2))
         painter.drawRoundedRect(1, 1, w - 2, h - 2, 4, 4)
@@ -317,22 +346,16 @@ class RoamZoneOverlayWidget(QWidget):
         for dot_y in (h // 2 - 6, h // 2, h // 2 + 6):
             painter.drawEllipse(w - 8, dot_y, 2, 2)
 
-        # Close button [✕] at top right
-        painter.setPen(QColor(210, 230, 255, 220))
-        font = painter.font()
-        font.setPixelSize(12)
-        font.setBold(True)
-        painter.setFont(font)
-        painter.drawText(w - 24, 16, "✕")
+        # Material Symbols Outlined Close button
+        cr = self.close_btn_rect()
+        if self._hover_close:
+            painter.setBrush(QColor(255, 255, 255, 35))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(cr, 4, 4)
 
-        # Center Label Badge
-        painter.setPen(QColor(255, 255, 255, 240))
-        font.setPixelSize(11)
-        font.setBold(False)
-        painter.setFont(font)
-        label_text = f"🚶 Зона прогулки Claude [{self.x()} — {self.x() + w}px]"
-        painter.drawText(QRect(14, 0, w - 42, h), Qt.AlignmentFlag.AlignCenter, label_text)
-
+        if getattr(self, "close_renderer", None) and self.close_renderer.isValid():
+            icon_r = QRectF(cr.x() + 3, cr.y() + 3, cr.width() - 6, cr.height() - 6)
+            self.close_renderer.render(painter, icon_r)
 
 class ClaudeTaskbarWidget(QWidget):
     def __init__(self):
@@ -1344,7 +1367,7 @@ class ClaudeTaskbarWidget(QWidget):
                 self._roam_step_timer.stop()
             self.roam_timer.stop()
             proj_label = f" ({self._current_coding_project})" if self._current_coding_project else ""
-            self.setToolTip(f"Claude Mascot — 💻 Пишет код{proj_label}")
+            self.setToolTip(f"Claude Mascot — Пишет код{proj_label}")
             # Classic laptop animation (typing) as originally was!
             self.play_animation("typing", loop=True, speed_ms=110)
             return
@@ -1352,7 +1375,7 @@ class ClaudeTaskbarWidget(QWidget):
         elif not is_coding and self.is_claude_coding:
             # Transition: Claude Code finished coding!
             self.is_claude_coding = False
-            self.setToolTip("Claude Mascot — ✨ Код готов!")
+            self.setToolTip("Claude Mascot — Код готов")
             celebration = random.choice(["cheer", "spark"])
             def on_celebration_done():
                 self.setToolTip("Claude Mascot")
@@ -1373,7 +1396,7 @@ class ClaudeTaskbarWidget(QWidget):
             # User has stepped away: Claude curls up to sleep
             self.is_sleeping_afk = True
             self.idle_timer.stop()
-            self.setToolTip("Claude Mascot — 💤 Спит (AFK)")
+            self.setToolTip("Claude Mascot — Спит (AFK)")
             self.play_animation("sleep", loop=True, speed_ms=200)
             return
 
@@ -1750,30 +1773,30 @@ class ClaudeTaskbarWidget(QWidget):
         """)
 
         # 1. Roam Zone Controls
-        roam_menu = self.tray_menu.addMenu("🟦 Зона прогулки (интервал)")
-        roam_act = roam_menu.addAction(f"{'✓ ' if self.roam_enabled else '   '}🚶 Разрешить медленные шаги")
+        roam_menu = self.tray_menu.addMenu("Зона прогулки")
+        roam_act = roam_menu.addAction(f"{'✓ ' if self.roam_enabled else '   '}Разрешить медленные шаги")
         roam_act.triggered.connect(self.toggle_roam_enabled)
 
-        show_zone_act = roam_menu.addAction("🟦 Настроить зону (показать синий интервал)...")
+        show_zone_act = roam_menu.addAction("Настроить зону на панели...")
         show_zone_act.triggered.connect(self.toggle_roam_overlay)
 
-        reset_zone_act = roam_menu.addAction("🔄 Сбросить зону (по умолчанию)")
+        reset_zone_act = roam_menu.addAction("Сбросить зону по умолчанию")
         reset_zone_act.triggered.connect(self.reset_roam_bounds)
 
         self.tray_menu.addSeparator()
 
         # 2. Windows Autostart on boot
         autostart_on = is_autostart_configured()
-        auto_act = self.tray_menu.addAction(f"{'✓ ' if autostart_on else '   '}🚀 Запускать при старте Windows")
+        auto_act = self.tray_menu.addAction(f"{'✓ ' if autostart_on else '   '}Запускать при старте Windows")
         auto_act.triggered.connect(self.toggle_autostart)
 
         self.tray_menu.addSeparator()
 
         # 3. Scale Submenu
-        scale_menu = self.tray_menu.addMenu("📐 Размер")
+        scale_menu = self.tray_menu.addMenu("Размер")
         scale_options = [
             ("Мини (16px, 2x)", 2),
-            ("Половина высоты панели (24px, 3x)", 3),
+            ("Обычный (24px, 3x)", 3),
             ("Средний (32px, 4x)", 4),
             ("Большой (40px, 5x)", 5),
             ("Вся высота панели (48px, 6x)", 6),
@@ -1784,7 +1807,7 @@ class ClaudeTaskbarWidget(QWidget):
             act.triggered.connect(lambda checked=False, f=factor: self.set_scale(f))
 
         # 4. Placement Submenu
-        place_menu = self.tray_menu.addMenu("📍 Позиция на панели")
+        place_menu = self.tray_menu.addMenu("Позиция на панели")
         bot_act = place_menu.addAction(f"{'✓ ' if self.placement_mode == 'bottom' else '   '}Внутри панели (снизу экрана)")
         bot_act.triggered.connect(lambda: self.set_placement_mode("bottom"))
 
@@ -1792,16 +1815,16 @@ class ClaudeTaskbarWidget(QWidget):
         top_act.triggered.connect(lambda: self.set_placement_mode("top"))
 
         # 5. Snapping and Reset
-        snap_act = self.tray_menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}🧲 Магнититься к панели")
+        snap_act = self.tray_menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}Магнититься к панели")
         snap_act.triggered.connect(self.toggle_snap_taskbar)
 
-        reset_pos_act = self.tray_menu.addAction("🔄 Сбросить позицию Claude")
+        reset_pos_act = self.tray_menu.addAction("Сбросить позицию Claude")
         reset_pos_act.triggered.connect(self.reset_to_default_pos)
 
         self.tray_menu.addSeparator()
 
         # 6. Exit
-        quit_act = self.tray_menu.addAction("❌ Закрыть")
+        quit_act = self.tray_menu.addAction("Закрыть")
         quit_act.triggered.connect(QApplication.instance().quit)
 
         if hasattr(self, "tray_icon") and self.tray_icon:
