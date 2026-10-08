@@ -591,13 +591,20 @@ class ClaudeTaskbarWidget(QWidget):
             return
 
         choices = [
-            ("blink", 45),
-            ("look_around", 20),
-            ("coffee", 10),
-            ("idea", 8),
-            ("yawn", 8),
+            ("blink", 30),
+            ("look_around", 15),
+            ("coffee", 8),
+            ("idea", 6),
+            ("yawn", 6),
             ("typing", 5),
+            ("cat", 5),
+            ("read", 5),
+            ("pizza", 4),
             ("peek", 4),
+            ("matrix", 3),
+            ("money", 3),
+            ("fire", 3),
+            ("wizard", 3),
         ]
         total = sum(w for _, w in choices)
         r = random.randint(1, total)
@@ -614,6 +621,10 @@ class ClaudeTaskbarWidget(QWidget):
             speed = 90
         elif selected == "typing":
             speed = 110
+        elif selected == "matrix":
+            speed = 120
+        elif selected == "rock":
+            speed = 100
 
         self.play_animation(selected, loop=False, speed_ms=speed)
 
@@ -628,6 +639,17 @@ class ClaudeTaskbarWidget(QWidget):
             ("cool", 130),
             ("idea", 120),
             ("spin", 90),
+            ("rock", 100),
+            ("dab", 110),
+            ("applause", 110),
+            ("wizard", 120),
+            ("superhero", 100),
+            ("workout", 120),
+            ("disco", 120),
+            ("ghost", 110),
+            ("rage", 100),
+            ("cat", 130),
+            ("pizza", 120),
         ]
         name, speed = random.choice(reactions)
         self.play_animation(name, loop=False, speed_ms=speed)
@@ -965,30 +987,60 @@ class ClaudeTaskbarWidget(QWidget):
             }
         """)
 
-        # Animations submenu
-        anim_menu = menu.addMenu("🎭 Анимации")
-        anim_list = [
-            ("👋 Помахать рукой (Wave)", "wave", 110, False),
-            ("🎉 Радость (Обе руки вверх)", "cheer", 120, False),
-            ("🦘 Прыжок (Jump)", "jump", 100, False),
-            ("💃 Весёлый танец (Dance)", "dance", 120, True),
-            ("💖 Любовь и сердечко", "heart", 130, False),
-            ("☕ Выпить чашку кофе", "coffee", 140, False),
-            ("💡 Осенила идея (Лампочка)", "idea", 120, False),
-            ("💻 Кодить за ноутбуком", "typing", 110, True),
-            ("🕶️ Крутой в очках", "cool", 130, False),
-            ("🔄 Покрутиться 360°", "spin", 90, False),
-            ("🙈 Спрятаться за панель", "peek", 120, False),
-            ("🥱 Зевнуть и потянуться", "yawn", 140, False),
-            ("❓ Недоумение (Вопрос)", "question", 130, False),
-            ("👀 Оглядеться по сторонам", "look_around", 130, False),
-            ("😉 Моргнуть", "blink", 90, False),
-            ("💤 Заснуть (Sleep)", "sleep", 200, True),
-            ("🛑 Обычный вид (Idle)", "idle", 100, False),
+        # Animations submenu with 32 animations categorized
+        anim_menu = menu.addMenu("🎭 Анимации (32)")
+
+        categories = [
+            ("😊 Эмоции и жесты", [
+                ("👋 Помахать рукой (Wave)", "wave", 110, False),
+                ("🎉 Радость (Cheer)", "cheer", 120, False),
+                ("🦘 Прыжок (Jump)", "jump", 100, False),
+                ("💃 Весёлый танец (Dance)", "dance", 120, True),
+                ("💖 Любовь и сердечко (Heart)", "heart", 130, False),
+                ("🕶️ Крутой в очках (Cool)", "cool", 130, False),
+                ("👏 Аплодисменты (Applause)", "applause", 110, False),
+                ("🤙 Победный дэб (Dab)", "dab", 110, False),
+                ("😭 Аниме-плач (Cry)", "cry", 110, False),
+                ("🥱 Зевнуть и потянуться (Yawn)", "yawn", 140, False),
+                ("❓ Недоумение (Question)", "question", 130, False),
+                ("👀 Оглядеться по сторонам", "look_around", 130, False),
+                ("😉 Моргнуть (Blink)", "blink", 90, False),
+            ]),
+            ("💻 Работа и код", [
+                ("💻 Кодить за ноутбуком (Typing)", "typing", 110, True),
+                ("🟢 Матрица / Хакер (Matrix)", "matrix", 120, True),
+                ("💡 Осенила идея (Idea)", "idea", 120, False),
+                ("📖 Читать документацию (Read)", "read", 130, False),
+                ("☕ Выпить чашку кофе (Coffee)", "coffee", 140, False),
+            ]),
+            ("🔥 Мемы и юмор", [
+                ("🍕 Кушать пиццу (Pizza)", "pizza", 120, False),
+                ("💥 Рейдж / Переворот стола (Rage)", "rage", 100, False),
+                ("🎸 Рок-концерт (Rock)", "rock", 100, True),
+                ("☕🔥 This is Fine (В огне)", "fire", 130, False),
+                ("🐱 Котик на голове (Cat)", "cat", 130, True),
+                ("💰 Денежный дождь (Money)", "money", 120, False),
+                ("🪩 Диско-вечеринка (Disco)", "disco", 120, True),
+            ]),
+            ("✨ Магия и экшен", [
+                ("🧙 Волшебник (Wizard)", "wizard", 120, False),
+                ("🦸 Супермен / Полёт (Superhero)", "superhero", 100, False),
+                ("👻 Привидение / Бу! (Ghost)", "ghost", 110, False),
+                ("🏋️ Качалка / Штанга (Workout)", "workout", 120, False),
+                ("🔄 Крутиться 360° (Spin)", "spin", 90, False),
+                ("🙈 Прятаться за панель (Peek)", "peek", 120, False),
+            ]),
+            ("💤 Режимы", [
+                ("💤 Заснуть (Sleep)", "sleep", 200, True),
+                ("🛑 Обычный вид (Idle)", "idle", 100, False),
+            ])
         ]
-        for title, anim_name, speed, loop in anim_list:
-            act = anim_menu.addAction(title)
-            act.triggered.connect(lambda checked=False, a=anim_name, s=speed, l=loop: self.play_animation(a, loop=l, speed_ms=s))
+
+        for cat_title, items in categories:
+            sub = anim_menu.addMenu(cat_title)
+            for title, anim_name, speed, loop in items:
+                act = sub.addAction(title)
+                act.triggered.connect(lambda checked=False, a=anim_name, s=speed, l=loop: self.play_animation(a, loop=l, speed_ms=s))
 
         menu.addSeparator()
 

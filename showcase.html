@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Pixel Taskbar — Интерактивная Презентация (32 Анимации)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --surface: #141720;
+      --surface-elevated: #1b1f2b;
+      --border: #262b3a;
+      --border-glow: rgba(218, 119, 88, 0.35);
+      --primary: #DA7758;
+      --primary-hover: #e58769;
+      --primary-glow: rgba(218, 119, 88, 0.4);
+      --text: #f0f2f7;
+      --text-muted: #8b92a5;
+      --text-dim: #5c6275;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    /* Ambient background glowing circles */
+    .ambient-glow {
+      position: fixed;
+      top: 10%;
+      right: 15%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(218, 119, 88, 0.12) 0%, rgba(218, 119, 88, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .ambient-glow-2 {
+      position: fixed;
+      bottom: 10%;
+      left: 10%;
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(80, 220, 240, 0.06) 0%, rgba(80, 220, 240, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 36px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-avatar {
+      width: 52px;
+      height: 52px;
+      background: var(--surface-elevated);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .brand-avatar img {
+      width: 38px;
+      height: 38px;
+      image-rendering: pixelated;
+    }
+
+    .brand-text h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 60%, var(--primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 4px 16px var(--primary-glow);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-outline:hover {
+      background: var(--surface-elevated);
+      border-color: var(--text-muted);
+      transform: translateY(-1px);
+    }
+
+    /* THEATER / MAIN STAGE */
+    .stage-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      margin-bottom: 48px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stage-grid {
+      display: grid;
+      grid-template-columns: 1fr 440px;
+      gap: 40px;
+      align-items: center;
+    }
+
+    @media (max-width: 980px) {
+      .stage-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left Info */
+    .stage-info {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .badge-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cat-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-emotion { background: rgba(235, 90, 130, 0.15); color: #ff7597; border: 1px solid rgba(235, 90, 130, 0.35); }
+    .badge-tech    { background: rgba(80, 220, 240, 0.15); color: #50dcf0; border: 1px solid rgba(80, 220, 240, 0.35); }
+    .badge-meme    { background: rgba(245, 140, 40, 0.15); color: #ffa245; border: 1px solid rgba(245, 140, 40, 0.35); }
+    .badge-magic   { background: rgba(165, 80, 230, 0.15); color: #b77bf7; border: 1px solid rgba(165, 80, 230, 0.35); }
+    .badge-mode    { background: rgba(90, 170, 240, 0.15); color: #6bb6ff; border: 1px solid rgba(90, 170, 240, 0.35); }
+
+    .anim-counter {
+      color: var(--text-muted);
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .stage-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 40px;
+      font-weight: 800;
+      line-height: 1.15;
+      color: #fff;
+    }
+
+    .stage-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      color: var(--primary);
+    }
+
+    .stage-desc {
+      font-size: 17px;
+      color: var(--text-muted);
+      max-width: 580px;
+    }
+
+    .stage-specs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-top: 8px;
+    }
+
+    .spec-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .spec-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .spec-val {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* Stage Controls */
+    .stage-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn-ctrl {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.15s;
+    }
+    .btn-ctrl:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .tour-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: rgba(218, 119, 88, 0.15);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tour-btn.active {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 4px 16px var(--primary-glow);
+    }
+
+    /* Right Display Box */
+    .stage-display {
+      background: radial-gradient(circle at center, rgba(218, 119, 88, 0.08) 0%, rgba(14, 16, 22, 0.95) 80%);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 256px;
+      height: 256px;
+      margin-bottom: 24px;
+    }
+
+    #stageCanvas {
+      width: 256px;
+      height: 256px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.6));
+    }
+
+    .stage-pedestal {
+      position: absolute;
+      bottom: 10px;
+      width: 200px;
+      height: 24px;
+      background: radial-gradient(ellipse, rgba(218, 119, 88, 0.3) 0%, rgba(0, 0, 0, 0) 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* Mini Simulated Taskbar inside Display */
+    .simulated-taskbar {
+      width: 100%;
+      background: #1e2027;
+      border: 1px solid #323642;
+      border-radius: 10px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    .sim-icons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sim-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+    }
+
+    .sim-claude-preview {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #taskbarCanvas {
+      width: 48px;
+      height: 48px;
+      image-rendering: pixelated;
+    }
+
+    .sim-caption {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    /* GALLERY SECTION */
+    .gallery-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .gallery-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+    .filter-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      position: relative;
+    }
+    .card:hover {
+      background: var(--surface-elevated);
+      border-color: var(--primary);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+    }
+    .card.active {
+      border-color: var(--primary);
+      background: rgba(218, 119, 88, 0.08);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .card-canvas {
+      width: 64px;
+      height: 64px;
+      image-rendering: pixelated;
+    }
+
+    .card-meta h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .card-meta p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .footer {
+      margin-top: 60px;
+      text-align: center;
+      padding-top: 30px;
+      border-top: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 14px;
+    }
+    .footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+  <div class="ambient-glow-2"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-avatar">
+          <img src="base.png" alt="Claude">
+        </div>
+        <div class="brand-text">
+          <h1>Claude Pixel Taskbar Mascot</h1>
+          <p>Интерактивная галерея и демонстрация всех 32 уникальных анимаций</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btnTourHeader" class="btn btn-primary" onclick="toggleTour()">▶ Авто-Презентация</button>
+        <button class="btn btn-outline" onclick="playRandom()">🎲 Случайная</button>
+        <a href="claude_showcase.mp4" download class="btn btn-outline">🎥 Скачать MP4 Видео</a>
+      </div>
+    </header>
+
+    <!-- MAIN THEATER STAGE -->
+    <section class="stage-section">
+      <div class="stage-grid">
+        <!-- Info Column -->
+        <div class="stage-info">
+          <div class="badge-row">
+            <span id="stageBadge" class="cat-badge badge-emotion">Эмоции</span>
+            <span id="stageCounter" class="anim-counter">#01 / 32</span>
+          </div>
+
+          <h2 id="stageTitle" class="stage-title">👋 Помахать рукой (Wave)</h2>
+          <div id="stageId" class="stage-id">claude.play_animation("wave")</div>
+          <p id="stageDesc" class="stage-desc">Дружелюбный привет пользователю правой рукой</p>
+
+          <div class="stage-specs">
+            <div class="spec-item">
+              <span class="spec-label">Кадров</span>
+              <span id="specFrames" class="spec-val">7 кадров</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">Скорость</span>
+              <span id="specSpeed" class="spec-val">110 мс / кадр</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">Сетка</span>
+              <span class="spec-val">16x16 Pixel Art</span>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="stage-controls">
+            <button class="btn-ctrl" title="Предыдущая" onclick="prevAnimation()">◀</button>
+            <button id="btnPlayPause" class="btn-ctrl" title="Пауза / Плей" onclick="togglePlayPause()">⏸</button>
+            <button class="btn-ctrl" title="Следующая" onclick="nextAnimation()">▶</button>
+            <button id="btnTour" class="tour-btn" onclick="toggleTour()">▶ Запустить Презентацию</button>
+          </div>
+        </div>
+
+        <!-- Hero Stage Display -->
+        <div class="stage-display">
+          <div class="canvas-wrapper">
+            <canvas id="stageCanvas" width="16" height="16"></canvas>
+            <div class="stage-pedestal"></div>
+          </div>
+
+          <!-- Simulated Windows 11 Taskbar -->
+          <div class="simulated-taskbar">
+            <div class="sim-icons">
+              <div class="sim-icon" style="background:#0078d4;"></div>
+              <div class="sim-icon" style="background:#faad14;"></div>
+              <div class="sim-icon" style="background:#52c41a;"></div>
+              <div class="sim-icon" style="background:#722ed1;"></div>
+            </div>
+            <div class="sim-claude-preview">
+              <canvas id="taskbarCanvas" width="16" height="16"></canvas>
+              <span class="sim-caption">Реальный размер 3x (48px)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GALLERY SECTION -->
+    <div class="gallery-header">
+      <h2 class="gallery-title">Каталог всех 32 анимаций</h2>
+      <div class="filter-tabs">
+        <button class="filter-btn active" onclick="setFilter('all', this)">Все (32)</button>
+        <button class="filter-btn" onclick="setFilter('emotion', this)">😊 Эмоции (13)</button>
+        <button class="filter-btn" onclick="setFilter('tech', this)">💻 Работа & Код (5)</button>
+        <button class="filter-btn" onclick="setFilter('meme', this)">🔥 Мемы & Юмор (7)</button>
+        <button class="filter-btn" onclick="setFilter('magic', this)">✨ Магия & Экшен (6)</button>
+        <button class="filter-btn" onclick="setFilter('mode', this)">💤 Режимы (1)</button>
+      </div>
+    </div>
+
+    <!-- Cards Grid -->
+    <div id="cardsGrid" class="grid"></div>
+
+    <footer class="footer">
+      <p>Claude Pixel Taskbar Mascot • 32 Анимации • 195 Кадров • Разработано для Windows 11</p>
+      <p style="margin-top: 6px;">Запускайте анимации прямо в трее Windows через правый клик мыши!</p>
+    </footer>
+  </div>
+
+  <script>
+    const ANIMATIONS = [
+      // 1. Classic & Emotions
+      { name: "wave", title: "👋 Помахать рукой (Wave)", cat: "emotion", catTitle: "Эмоции", desc: "Дружелюбный привет пользователю правой рукой", speed: 110, frames: 7 },
+      { name: "cheer", title: "🎉 Радость (Cheer)", cat: "emotion", catTitle: "Эмоции", desc: "Победный восторг с обеими поднятыми руками", speed: 120, frames: 7 },
+      { name: "jump", title: "🦘 Прыжок (Jump)", cat: "emotion", catTitle: "Эмоции", desc: "Пружинистый прыжок с деформацией тела", speed: 100, frames: 7 },
+      { name: "dance", title: "💃 Весёлый танец (Dance)", cat: "emotion", catTitle: "Эмоции", desc: "Ритмичный шаг влево и вправо в такт музыке", speed: 120, frames: 4 },
+      { name: "heart", title: "💖 Любовь и сердечко (Heart)", cat: "emotion", catTitle: "Эмоции", desc: "Смущенный румянец и бьющееся сердце", speed: 130, frames: 6 },
+      { name: "cool", title: "🕶️ Крутой в очках (Cool)", cat: "emotion", catTitle: "Эмоции", desc: "Черные очки падают с блеском", speed: 130, frames: 6 },
+      { name: "applause", title: "👏 Аплодисменты (Applause)", cat: "emotion", catTitle: "Эмоции", desc: "Бурные овации в ладоши и палец вверх автору", speed: 110, frames: 7 },
+      { name: "dab", title: "🤙 Победный дэб (Dab)", cat: "emotion", catTitle: "Эмоции", desc: "Стильный победный дэб с наклоном головы в локоть", speed: 110, frames: 6 },
+      { name: "cry", title: "😭 Аниме-плач (Cry)", cat: "emotion", catTitle: "Эмоции", desc: "Драматичные фонтаны слез в обе стороны", speed: 110, frames: 6 },
+      { name: "yawn", title: "🥱 Зевнуть и потянуться (Yawn)", cat: "emotion", catTitle: "Эмоции", desc: "Усталый зевок с открытым ртом", speed: 140, frames: 5 },
+      { name: "question", title: "❓ Недоумение (Question)", cat: "emotion", catTitle: "Эмоции", desc: "Наклон головы и вопросительный знак над головой", speed: 130, frames: 5 },
+      { name: "look_around", title: "👀 Оглядеться по сторонам", cat: "emotion", catTitle: "Эмоции", desc: "Любопытный взгляд влево, вправо и вперед", speed: 130, frames: 7 },
+      { name: "blink", title: "😉 Моргнуть (Blink)", cat: "emotion", catTitle: "Эмоции", desc: "Естественное моргание в фоновом режиме", speed: 90, frames: 4 },
+
+      // 2. Tech & Code
+      { name: "typing", title: "💻 Кодить за ноутбуком (Typing)", cat: "tech", catTitle: "Работа и код", desc: "Быстрый набор кода на светящемся кибер-ноуте", speed: 110, frames: 6 },
+      { name: "matrix", title: "🟢 Матрица / Хакер (Matrix)", cat: "tech", catTitle: "Работа и код", desc: "Зеленый цифровой дождь кода и неоновый визор", speed: 120, frames: 6 },
+      { name: "idea", title: "💡 Осенила идея (Idea)", cat: "tech", catTitle: "Работа и код", desc: "Яркая вспышка лампочки с лучами вдохновения", speed: 120, frames: 6 },
+      { name: "read", title: "📖 Читать документацию (Read)", cat: "tech", catTitle: "Работа и код", desc: "Изучает мануал и аккуратно листает страницу", speed: 130, frames: 6 },
+      { name: "coffee", title: "☕ Выпить чашку кофе (Coffee)", cat: "tech", catTitle: "Работа и код", desc: "Горячая кружка кофе с ароматным паром", speed: 140, frames: 5 },
+
+      // 3. Memes & Fun
+      { name: "pizza", title: "🍕 Кушать пиццу (Pizza)", cat: "meme", catTitle: "Мемы и юмор", desc: "Аппетитный горячий ломтик с тянущимся сыром", speed: 120, frames: 6 },
+      { name: "rage", title: "💥 Рейдж / Переворот стола (Rage)", cat: "meme", catTitle: "Мемы и юмор", desc: "Классический (╯°□°)╯︵ ┻━┻ после бага в коде", speed: 100, frames: 7 },
+      { name: "rock", title: "🎸 Рок-концерт (Rock)", cat: "meme", catTitle: "Мемы и юмор", desc: "Забойное соло на электрогитаре с хедбэнгингом", speed: 100, frames: 6 },
+      { name: "fire", title: "☕🔥 This is Fine (В огне)", cat: "meme", catTitle: "Мемы и юмор", desc: "Вокруг бушует пламя, а Клод спокоен с чашкой", speed: 130, frames: 6 },
+      { name: "cat", title: "🐱 Котик на голове (Cat)", cat: "meme", catTitle: "Мемы и юмор", desc: "Мурчащий рыжий котенок с виляющим хвостиком", speed: 130, frames: 6 },
+      { name: "money", title: "💰 Денежный дождь (Money)", cat: "meme", catTitle: "Мемы и юмор", desc: "Дождь из золотых монет и хрустящих банкнот", speed: 120, frames: 6 },
+      { name: "disco", title: "🪩 Диско-вечеринка (Disco)", cat: "meme", catTitle: "Мемы и юмор", desc: "Позы Траволты под сверкающим диско-шаром", speed: 120, frames: 6 },
+
+      // 4. Action & Magic
+      { name: "wizard", title: "🧙 Волшебник (Wizard)", cat: "magic", catTitle: "Магия и экшен", desc: "Шляпа мага, взмах палочки и сноп волшебных звезд", speed: 120, frames: 6 },
+      { name: "superhero", title: "🦸 Супермен / Полёт (Superhero)", cat: "magic", catTitle: "Магия и экшен", desc: "Развевающийся красный плащ и взлет в небо", speed: 100, frames: 7 },
+      { name: "ghost", title: "👻 Привидение / Бу! (Ghost)", cat: "magic", catTitle: "Магия и экшен", desc: "Превращение в милое привидение с криком Бу!", speed: 110, frames: 7 },
+      { name: "workout", title: "🏋️ Качалка / Штанга (Workout)", cat: "magic", catTitle: "Магия и экшен", desc: "Рывок тяжелой штанги над головой и флекс мышц", speed: 120, frames: 7 },
+      { name: "spin", title: "🔄 Крутиться на 360° (Spin)", cat: "magic", catTitle: "Магия и экшен", desc: "Стремительный полный оборот вокруг своей оси", speed: 90, frames: 7 },
+      { name: "peek", title: "🙈 Прятаться за панель (Peek)", cat: "magic", catTitle: "Магия и экшен", desc: "Опускается за край панели и высматривает", speed: 120, frames: 7 },
+
+      // 5. Modes
+      { name: "sleep", title: "💤 Заснуть (Sleep Zzz)", cat: "mode", catTitle: "Режимы", desc: "Глубокий уютный сон с улетающими буквами Zzz", speed: 200, frames: 5 },
+    ];
+
+    let currentAnimIdx = 0;
+    let isPlaying = true;
+    let isTourActive = false;
+    let tourTimer = null;
+    let stageTimer = null;
+    let stageFrameIdx = 0;
+
+    // Cache preloaded Image objects: { animName: [Image, Image, ...] }
+    const loadedFrames = {};
+
+    function preloadAll() {
+      ANIMATIONS.forEach(anim => {
+        loadedFrames[anim.name] = [];
+        for (let i = 0; i < anim.frames; i++) {
+          const img = new Image();
+          const frameNum = String(i).padStart(2, '0');
+          img.src = `animations/${anim.name}_${frameNum}.png`;
+          loadedFrames[anim.name].push(img);
+        }
+      });
+    }
+
+    // Render Stage
+    const stageCanvas = document.getElementById('stageCanvas');
+    const stageCtx = stageCanvas.getContext('2d');
+    stageCtx.imageSmoothingEnabled = false;
+
+    const taskbarCanvas = document.getElementById('taskbarCanvas');
+    const taskbarCtx = taskbarCanvas.getContext('2d');
+    taskbarCtx.imageSmoothingEnabled = false;
+
+    function renderStageFrame() {
+      const anim = ANIMATIONS[currentAnimIdx];
+      const frames = loadedFrames[anim.name];
+      if (!frames || frames.length === 0) return;
+
+      const img = frames[stageFrameIdx % frames.length];
+      if (img.complete && img.naturalWidth !== 0) {
+        stageCtx.clearRect(0, 0, 16, 16);
+        stageCtx.drawImage(img, 0, 0);
+
+        taskbarCtx.clearRect(0, 0, 16, 16);
+        taskbarCtx.drawImage(img, 0, 0);
+      }
+    }
+
+    function startStageLoop() {
+      if (stageTimer) clearInterval(stageTimer);
+      const anim = ANIMATIONS[currentAnimIdx];
+      stageFrameIdx = 0;
+
+      stageTimer = setInterval(() => {
+        if (!isPlaying) return;
+        renderStageFrame();
+        stageFrameIdx = (stageFrameIdx + 1) % anim.frames;
+      }, anim.speed);
+    }
+
+    function selectAnimation(idx) {
+      currentAnimIdx = idx;
+      const anim = ANIMATIONS[idx];
+
+      document.getElementById('stageTitle').textContent = anim.title;
+      document.getElementById('stageDesc').textContent = anim.desc;
+      document.getElementById('stageId').textContent = `claude.play_animation("${anim.name}")`;
+      document.getElementById('stageCounter').textContent = `#${String(idx + 1).padStart(2, '0')} / ${ANIMATIONS.length}`;
+      document.getElementById('specFrames').textContent = `${anim.frames} кадров`;
+      document.getElementById('specSpeed').textContent = `${anim.speed} мс / кадр`;
+
+      const badge = document.getElementById('stageBadge');
+      badge.textContent = anim.catTitle;
+      badge.className = `cat-badge badge-${anim.cat}`;
+
+      // Update active card styling
+      document.querySelectorAll('.card').forEach((c, i) => {
+        c.classList.toggle('active', i === idx);
+      });
+
+      startStageLoop();
+    }
+
+    function nextAnimation() {
+      selectAnimation((currentAnimIdx + 1) % ANIMATIONS.length);
+    }
+
+    function prevAnimation() {
+      selectAnimation((currentAnimIdx - 1 + ANIMATIONS.length) % ANIMATIONS.length);
+    }
+
+    function togglePlayPause() {
+      isPlaying = !isPlaying;
+      document.getElementById('btnPlayPause').textContent = isPlaying ? '⏸' : '▶';
+    }
+
+    function playRandom() {
+      const rnd = Math.floor(Math.random() * ANIMATIONS.length);
+      selectAnimation(rnd);
+    }
+
+    function toggleTour() {
+      isTourActive = !isTourActive;
+      const btn = document.getElementById('btnTour');
+      const btnH = document.getElementById('btnTourHeader');
+
+      if (isTourActive) {
+        btn.classList.add('active');
+        btn.textContent = '⏹ Остановить тур';
+        btnH.textContent = '⏹ Стоп тур';
+        isPlaying = true;
+        document.getElementById('btnPlayPause').textContent = '⏸';
+
+        tourTimer = setInterval(() => {
+          nextAnimation();
+        }, 2600);
+      } else {
+        btn.classList.remove('active');
+        btn.textContent = '▶ Запустить Презентацию';
+        btnH.textContent = '▶ Авто-Презентация';
+        clearInterval(tourTimer);
+      }
+    }
+
+    // Grid Cards Building
+    function buildGrid(filterCat = 'all') {
+      const grid = document.getElementById('cardsGrid');
+      grid.innerHTML = '';
+
+      ANIMATIONS.forEach((anim, idx) => {
+        if (filterCat !== 'all' && anim.cat !== filterCat) return;
+
+        const card = document.createElement('div');
+        card.className = `card ${idx === currentAnimIdx ? 'active' : ''}`;
+        card.onclick = () => selectAnimation(idx);
+
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="cat-badge badge-${anim.cat}">${anim.catTitle}</span>
+            <span style="font-size:12px; font-weight:700; color:var(--text-dim);">#${String(idx + 1).padStart(2, '0')}</span>
+          </div>
+          <div class="card-center">
+            <canvas id="cardCanvas_${idx}" class="card-canvas" width="16" height="16"></canvas>
+          </div>
+          <div class="card-meta">
+            <h3>${anim.title}</h3>
+            <p>${anim.desc}</p>
+          </div>
+          <div class="card-footer">
+            <span>Кадров: ${anim.frames}</span>
+            <span>Скорость: ${anim.speed}ms</span>
+          </div>
+        `;
+        grid.appendChild(card);
+
+        // Animate card miniature
+        const cvs = card.querySelector(`#cardCanvas_${idx}`);
+        const ctx = cvs.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        let frame = 0;
+        setInterval(() => {
+          const frames = loadedFrames[anim.name];
+          if (frames && frames.length > 0) {
+            const img = frames[frame % frames.length];
+            if (img.complete && img.naturalWidth !== 0) {
+              ctx.clearRect(0, 0, 16, 16);
+              ctx.drawImage(img, 0, 0);
+            }
+          }
+          frame++;
+        }, anim.speed);
+      });
+    }
+
+    function setFilter(cat, btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      buildGrid(cat);
+    }
+
+    // Init
+    preloadAll();
+    buildGrid();
+    selectAnimation(0);
+  </script>
+</body>
+</html>
