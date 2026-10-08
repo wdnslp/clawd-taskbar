@@ -1230,6 +1230,7 @@ class ClaudeTaskbarWidget(QWidget):
             self.assert_topmost()
 
         self.save_config()
+        self.rebuild_tray_menu()
 
 
     # --- Smart Context Logic (Claude Code, AFK Sleep, IDE Focus) ---
@@ -1769,19 +1770,20 @@ class ClaudeTaskbarWidget(QWidget):
     def rebuild_tray_menu(self):
         """Constructs a clean, modern dark menu without clutter."""
         self.tray_menu = QMenu(self)
-        self.tray_menu.setStyleSheet("""
+        menu_style = """
             QMenu {
                 background-color: #1e1e1e;
                 color: #f0f0f0;
                 border: 1px solid #383838;
                 border-radius: 8px;
-                padding: 6px;
+                padding: 6px 8px;
                 font-family: 'Segoe UI', sans-serif;
                 font-size: 13px;
             }
             QMenu::item {
-                padding: 6px 24px 6px 20px;
+                padding: 6px 24px 6px 8px;
                 border-radius: 4px;
+                margin: 2px 4px;
             }
             QMenu::item:selected {
                 background-color: #DA7758;
@@ -1792,13 +1794,18 @@ class ClaudeTaskbarWidget(QWidget):
                 background-color: #333333;
                 margin: 4px 8px;
             }
-        """)
+            QMenu::icon {
+                margin-left: 10px;
+            }
+        """
+        self.tray_menu.setStyleSheet(menu_style)
 
         # 1. Roam Zone Controls (with Material Symbols)
         roam_menu = self.tray_menu.addMenu("Зона прогулки")
+        roam_menu.setStyleSheet(menu_style)
         roam_menu.setIcon(get_material_icon("zone"))
 
-        roam_act = roam_menu.addAction(get_material_icon("walk"), f"{'✓ ' if self.roam_enabled else '   '}Разрешить медленные шаги")
+        roam_act = roam_menu.addAction(get_material_icon("check" if self.roam_enabled else "blank"), "Разрешить медленные шаги")
         roam_act.triggered.connect(self.toggle_roam_enabled)
 
         show_zone_act = roam_menu.addAction(get_material_icon("tune"), "Настроить зону на панели...")
@@ -1811,13 +1818,14 @@ class ClaudeTaskbarWidget(QWidget):
 
         # 2. Windows Autostart on boot
         autostart_on = is_autostart_configured()
-        auto_act = self.tray_menu.addAction(get_material_icon("power"), f"{'✓ ' if autostart_on else '   '}Запускать при старте Windows")
+        auto_act = self.tray_menu.addAction(get_material_icon("check" if autostart_on else "blank"), "Запускать при старте Windows")
         auto_act.triggered.connect(self.toggle_autostart)
 
         self.tray_menu.addSeparator()
 
         # 3. Scale Submenu
         scale_menu = self.tray_menu.addMenu("Размер")
+        scale_menu.setStyleSheet(menu_style)
         scale_menu.setIcon(get_material_icon("size"))
         scale_options = [
             ("Мини (16px, 2x)", 2),
@@ -1828,20 +1836,21 @@ class ClaudeTaskbarWidget(QWidget):
             ("Гигантский (64px, 8x)", 8),
         ]
         for title, factor in scale_options:
-            act = scale_menu.addAction(f"{'✓ ' if self.scale_factor == factor else '   '}{title}")
+            act = scale_menu.addAction(get_material_icon("check" if self.scale_factor == factor else "blank"), title)
             act.triggered.connect(lambda checked=False, f=factor: self.set_scale(f))
 
         # 4. Placement Submenu
         place_menu = self.tray_menu.addMenu("Позиция на панели")
+        place_menu.setStyleSheet(menu_style)
         place_menu.setIcon(get_material_icon("position"))
-        bot_act = place_menu.addAction(f"{'✓ ' if self.placement_mode == 'bottom' else '   '}Внутри панели (снизу экрана)")
+        bot_act = place_menu.addAction(get_material_icon("check" if self.placement_mode == "bottom" else "blank"), "Внутри панели (снизу экрана)")
         bot_act.triggered.connect(lambda: self.set_placement_mode("bottom"))
 
-        top_act = place_menu.addAction(f"{'✓ ' if self.placement_mode == 'top' else '   '}Сверху панели (на бордюре)")
+        top_act = place_menu.addAction(get_material_icon("check" if self.placement_mode == "top" else "blank"), "Сверху панели (на бордюре)")
         top_act.triggered.connect(lambda: self.set_placement_mode("top"))
 
         # 5. Snapping and Reset
-        snap_act = self.tray_menu.addAction(get_material_icon("pin"), f"{'✓ ' if self.snap_to_taskbar else '   '}Магнититься к панели")
+        snap_act = self.tray_menu.addAction(get_material_icon("check" if self.snap_to_taskbar else "blank"), "Магнититься к панели")
         snap_act.triggered.connect(self.toggle_snap_taskbar)
 
         reset_pos_act = self.tray_menu.addAction(get_material_icon("refresh"), "Сбросить позицию Claude")

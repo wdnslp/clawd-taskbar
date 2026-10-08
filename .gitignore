@@ -14,3 +14,7 @@ venv/
 # Preview / temp
 taskbar_preview.png
 *.mp4
+scratch/
+/*.png
+!assets/
+!assets/icons/*.png
