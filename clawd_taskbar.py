@@ -575,6 +575,12 @@ class ClawdTaskbarWidget(QWidget):
         self._recent_idle_history = []
         self.idle_frequency_mode = "normal"
 
+        # Coding animation natural occasional blink state
+        self._typing_loop_counter = 0
+        self._typing_blink_target = random.randint(4, 7)
+        self._typing_blink_active = False
+        self._typing_blink_pixmap = None
+
         # Roam Zone (Slow occasional wandering within semi-transparent blue interval)
         self.roam_enabled = True
         self.roam_screen_min_x = None
@@ -1043,6 +1049,20 @@ class ClawdTaskbarWidget(QWidget):
                 for img in img_list
             ]
 
+        # Generate occasional natural blink frame for typing animation (without cheek blush)
+        if "typing" in self.raw_animations and len(self.raw_animations["typing"]) > 10:
+            frame10_img = self.raw_animations["typing"][10].copy()
+            blink_color = QColor(186, 94, 66, 255)
+            frame10_img.setPixelColor(5, 5, blink_color)
+            frame10_img.setPixelColor(10, 5, blink_color)
+            self._typing_blink_pixmap = QPixmap.fromImage(frame10_img).scaled(
+                w, h,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.FastTransformation
+            )
+        else:
+            self._typing_blink_pixmap = None
+
         self.setFixedSize(w, h)
         self._update_current_pixmap()
 
@@ -1050,7 +1070,12 @@ class ClawdTaskbarWidget(QWidget):
         frames = self.scaled_animations.get(self.current_anim_name, self.scaled_animations.get("idle", []))
         if frames:
             idx = min(self.current_frame_idx, len(frames) - 1)
-            self.current_pixmap = frames[idx]
+            if (self.current_anim_name == "typing" and idx == 10
+                    and getattr(self, "_typing_blink_active", False)
+                    and getattr(self, "_typing_blink_pixmap", None)):
+                self.current_pixmap = self._typing_blink_pixmap
+            else:
+                self.current_pixmap = frames[idx]
         else:
             self.current_pixmap = None
         self.update()
@@ -1066,6 +1091,11 @@ class ClawdTaskbarWidget(QWidget):
             self._last_pet_mouse_pos = None
             if hasattr(self, "_pet_timer") and self._pet_timer.isActive():
                 self._pet_timer.stop()
+
+        if name == "typing":
+            self._typing_loop_counter = 0
+            self._typing_blink_target = random.randint(4, 7)
+            self._typing_blink_active = False
 
         self.current_anim_name = name
         self.current_frame_idx = 0
@@ -1111,10 +1141,18 @@ class ClawdTaskbarWidget(QWidget):
 
         if self.current_frame_idx + 1 < len(frames):
             self.current_frame_idx += 1
+            if self.current_anim_name == "typing" and self.current_frame_idx == 11:
+                self._typing_blink_active = False
             self._update_current_pixmap()
         else:
             if self.is_looping:
                 self.current_frame_idx = 0
+                if self.current_anim_name == "typing":
+                    self._typing_loop_counter += 1
+                    if self._typing_loop_counter >= self._typing_blink_target:
+                        self._typing_blink_active = True
+                        self._typing_loop_counter = 0
+                        self._typing_blink_target = random.randint(4, 7)
                 self._update_current_pixmap()
             else:
                 self.anim_timer.stop()
