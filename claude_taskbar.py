@@ -607,7 +607,6 @@ class ClaudeTaskbarWidget(QWidget):
             ("chat", 7),
             ("idea", 6),
             ("typing", 6),
-            ("pizza", 4),
             ("peek", 4),
             ("matrix", 4),
             ("shield", 3),
@@ -646,7 +645,6 @@ class ClaudeTaskbarWidget(QWidget):
             ("coffee", 140),
             ("wizard", 120),
             ("workout", 120),
-            ("pizza", 120),
             ("idea", 120),
             ("spin", 90),
         ]
@@ -1016,8 +1014,8 @@ class ClaudeTaskbarWidget(QWidget):
             }
         """)
 
-        # Animations submenu with 24 animations categorized
-        anim_menu = menu.addMenu("🎭 Анимации (24)")
+        # Animations submenu with 23 animations categorized
+        anim_menu = menu.addMenu("🎭 Анимации (23)")
 
         categories = [
             ("✨ Фирменный Claude & AI", [
@@ -1030,7 +1028,6 @@ class ClaudeTaskbarWidget(QWidget):
                 ("💻 Кодить за ноутбуком (Typing)", "typing", 110, True),
                 ("💡 Осенила идея (Idea)", "idea", 120, False),
                 ("☕ Чашка кофе (Coffee)", "coffee", 140, False),
-                ("🍕 Кушать пиццу (Pizza)", "pizza", 120, False),
             ]),
             ("😊 Эмоции и жесты", [
                 ("👋 Помахать рукой (Wave)", "wave", 110, False),

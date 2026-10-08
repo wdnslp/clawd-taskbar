@@ -590,35 +590,6 @@ def gen_matrix():
     save_frame(f4, "matrix", 4)
     save_frame(base, "matrix", 5)
 
-# ==========================================
-# 16. Pizza (Кушает пиццу — аккуратная лапка)
-# ==========================================
-def gen_pizza():
-    base = get_base_grid()
-    f0 = [row[:] for row in base]
-    f0[6][14] = BR; f0[7][14] = BR
-    f0[7][12] = CH; f0[7][13] = CH; f0[8][11] = CH
-    f0[7][13] = R
-    save_frame(f0, "pizza", 0)
-
-    f1 = [row[:] for row in base]
-    f1[6][9] = CH; f1[6][10] = R; f1[7][8] = CH; f1[7][9] = CH; f1[6][11] = BR
-    f1[7][6] = E; f1[7][7] = E
-    save_frame(f1, "pizza", 1)
-
-    f2 = [row[:] for row in base]
-    f2[5][5] = CD; f2[5][10] = CD
-    f2[7][7] = Y; f2[7][8] = Y; f2[7][9] = CH; f2[7][10] = CH; f2[6][11] = BR
-    f2[6][6] = P; f2[6][9] = P
-    save_frame(f2, "pizza", 2)
-
-    f3 = [row[:] for row in base]
-    f3[5][5] = CD; f3[5][10] = CD
-    f3[6][4] = P; f3[6][11] = P
-    f3[1][7] = R; f3[1][8] = R; f3[2][7] = R; f3[2][8] = R
-    save_frame(f3, "pizza", 3)
-
-    save_frame(base, "pizza", 4)
 
 # ==========================================
 # 17. Wizard (Волшебник)
@@ -955,7 +926,6 @@ def main():
     gen_peek()
     gen_question()
     gen_matrix()
-    gen_pizza()
     gen_wizard()
     gen_workout()
     gen_cry()
