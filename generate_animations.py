@@ -434,153 +434,248 @@ def gen_typing():
     save_frame(f1, "typing", 11)
 
 
+
 # ==========================================
-# 11b. Laptop Think (Поиск бага / Размышления перед ноутбуком)
+# 11a. Laptop Front (Фронтальный вид — ноутбук прямо спереди по центру)
 # ==========================================
-def gen_laptop_think():
+def gen_laptop_front():
     base = get_base_grid()
-    def get_laptop_base():
+    def get_front_base():
+        f = [row[:] for row in base]
+        # Central screen (cols 5-10, rows 7-8)
+        f[7][5] = GR; f[7][10] = GR
+        f[8][5] = GR; f[8][10] = GR
+        for x in (6, 7, 8, 9):
+            f[7][x] = CY; f[8][x] = CY
+        # Keyboard base (cols 4-11, row 9)
+        for x in range(4, 12):
+            f[9][x] = DG
+        return f
+
+    # 0: Screen glowing, hands hovering over keyboard
+    f0 = get_front_base()
+    f0[8][4] = C; f0[8][11] = C
+    f0[7][7] = W; f0[8][7] = W  # cursor
+    save_frame(f0, "laptop_front", 0)
+
+    # 1: Left paw keystroke
+    f1 = get_front_base()
+    f1[9][4] = C; f1[8][11] = C
+    f1[7][6] = W; f1[7][8] = W
+    save_frame(f1, "laptop_front", 1)
+
+    # 2: Right paw keystroke
+    f2 = get_front_base()
+    f2[8][4] = C; f2[9][11] = C
+    f2[8][8] = W; f2[8][9] = W
+    save_frame(f2, "laptop_front", 2)
+
+    # 3: Green code scrolling across central screen
+    f3 = get_front_base()
+    f3[8][4] = C; f3[8][11] = C
+    for x in (6, 7, 8, 9):
+        f3[7][x] = G; f3[8][x] = GD
+    f3[7][8] = W
+    save_frame(f3, "laptop_front", 3)
+
+# ==========================================
+# 11b. Laptop Classic (Классический тонкий ультрабук)
+# ==========================================
+def gen_laptop_classic():
+    base = get_base_grid()
+    def get_classic_base():
         f = [row[:] for row in base]
         f[7][13] = GR; f[7][14] = GR
         f[8][13] = CY; f[8][14] = GR
         f[9][11] = GR; f[9][12] = GR; f[9][13] = GR
         return f
 
-    # 0: Looking at laptop screen, hands on keyboard
-    f0 = get_laptop_base()
+    # 0: Ready
+    f0 = get_classic_base()
     f0[8][11] = C; f0[8][12] = C
-    save_frame(f0, "laptop_think", 0)
+    f0[7][13] = W
+    save_frame(f0, "laptop_classic", 0)
 
-    # 1: Puzzled look: right hand taps cheek, eyes squint thinking
-    f1 = get_laptop_base()
-    f1[6][10] = C; f1[7][10] = C  # paw touches cheek
-    f1[5][5] = CD; f1[5][10] = CD  # squint thinking eyes
-    f1[8][13] = DG  # screen dims during thought
-    save_frame(f1, "laptop_think", 1)
+    # 1: Left stroke
+    f1 = get_classic_base()
+    f1[8][10] = C; f1[8][12] = C
+    f1[8][13] = W
+    save_frame(f1, "laptop_classic", 1)
 
-    # 2: Looking up at ceiling, solving bug in head
-    f2 = get_laptop_base()
-    f2[6][10] = C; f2[7][10] = C
-    f2[5][5] = C; f2[5][10] = C
-    f2[4][5] = E; f2[4][10] = E    # eyes look up to row 4
-    save_frame(f2, "laptop_think", 2)
+    # 2: Right stroke
+    f2 = get_classic_base()
+    f2[8][11] = C; f2[8][13] = C
+    f2[7][13] = CY; f2[8][13] = CY
+    save_frame(f2, "laptop_classic", 2)
 
-    # 3: Eureka! Idea spark above head!
-    f3 = get_laptop_base()
-    f3[6][10] = C; f3[7][10] = C
-    f3[5][5] = E; f3[5][10] = E    # wide bright eyes
-    f3[2][7] = Y; f3[2][8] = Y    # yellow idea bulb/spark
-    f3[1][7] = W; f3[1][8] = W
-    f3[3][7] = Y; f3[3][8] = Y
-    save_frame(f3, "laptop_think", 3)
-
-    # 4: Found it! Snaps paw back to keyboard, bright green success screen
-    f4 = get_laptop_base()
-    f4[8][11] = C; f4[8][12] = C
-    f4[7][13] = G; f4[8][13] = G  # bright green terminal fix!
-    f4[6][4] = P; f4[6][11] = P    # happy blush
-    save_frame(f4, "laptop_think", 4)
-
-    # 5: Satisfied smile at screen
-    f5 = get_laptop_base()
-    f5[7][13] = G; f5[8][13] = CY
-    f5[5][5] = CD; f5[5][10] = CD
-    save_frame(f5, "laptop_think", 5)
-
-# ==========================================
-# 11c. Laptop Hack (Турбо-режим / Скоростной матричный хакинг)
-# ==========================================
-def gen_laptop_hack():
-    base = get_base_grid()
-    def get_laptop_base():
-        f = [row[:] for row in base]
-        f[7][13] = GR; f[7][14] = GR
-        f[8][13] = G; f[8][14] = GR   # Matrix green terminal screen!
-        f[9][11] = GR; f[9][12] = GR; f[9][13] = GR
-        return f
-
-    # 0: Left paw fast tap, screen line 1
-    f0 = get_laptop_base()
-    f0[8][10] = C; f0[8][11] = C  # left paw striking
-    f0[7][13] = W; f0[8][13] = G   # white cursor flash on green
-    save_frame(f0, "laptop_hack", 0)
-
-    # 1: Right paw fast tap, screen line 2
-    f1 = get_laptop_base()
-    f1[8][12] = C; f1[8][13] = C  # right paw striking
-    f1[7][13] = G; f1[8][13] = W
-    save_frame(f1, "laptop_hack", 1)
-
-    # 2: Speed spark! Both paws flying, speed spark at keyboard
-    f2 = get_laptop_base()
-    f2[7][10] = C; f2[7][13] = C  # paws hovering high from speed
-    f2[8][14] = Y                  # yellow keystroke spark!
-    f2[7][13] = CY; f2[8][13] = G
-    save_frame(f2, "laptop_hack", 2)
-
-    # 3: Rapid alternation, screen stream
-    f3 = get_laptop_base()
+    # 3: Green success compile
+    f3 = get_classic_base()
     f3[8][11] = C; f3[8][12] = C
     f3[7][13] = G; f3[8][13] = G
-    f3[4][13] = CY                 # cyber reflection on head
-    save_frame(f3, "laptop_hack", 3)
+    f3[6][4] = P; f3[6][11] = P
+    save_frame(f3, "laptop_classic", 3)
 
 # ==========================================
-# 11d. Laptop Coffee (Кодинг с глотком кофе / Developer Fuel)
+# 11c. Laptop Retro (Винтажный толстый ThinkPad с трекпоинтом и янтарным экраном)
 # ==========================================
-def gen_laptop_coffee():
+def gen_laptop_retro():
     base = get_base_grid()
-    def get_laptop_with_mug():
+    def get_retro_base():
         f = [row[:] for row in base]
-        f[7][13] = GR; f[7][14] = GR
-        f[8][13] = CY; f[8][14] = GR
-        f[9][11] = GR; f[9][12] = GR; f[9][13] = GR
-        # Coffee mug on floor beside laptop (cols 2-3, rows 8-9)
-        f[8][2] = BR; f[8][3] = BR
-        f[9][2] = BR; f[9][3] = BR
-        f[8][1] = BR  # mug handle
+        # Thick dark chassis
+        f[6][13] = DG; f[6][14] = DG
+        f[7][13] = OR; f[7][14] = DG  # Amber phosphor display!
+        f[8][13] = OR; f[8][14] = DG
+        # High mechanical keyboard with red trackpoint at col 12, row 9
+        f[9][10] = DG; f[9][11] = DG; f[9][12] = R; f[9][13] = DG; f[9][14] = DG
         return f
 
-    # 0: Coding with mug steaming beside
-    f0 = get_laptop_with_mug()
-    f0[8][11] = C; f0[8][12] = C  # typing paws
-    f0[7][2] = W                  # steam curl
-    save_frame(f0, "laptop_coffee", 0)
+    # 0: Amber cursor blink
+    f0 = get_retro_base()
+    f0[8][10] = C; f0[8][11] = C
+    f0[7][13] = Y  # bright amber cursor
+    save_frame(f0, "laptop_retro", 0)
 
-    # 1: Steam rises higher
-    f1 = get_laptop_with_mug()
+    # 1: Typing on chunky mechanical keys
+    f1 = get_retro_base()
+    f1[8][11] = C; f1[8][13] = C
+    f1[7][13] = OR; f1[8][13] = Y
+    save_frame(f1, "laptop_retro", 1)
+
+    # 2: Touching red trackpoint!
+    f2 = get_retro_base()
+    f2[8][12] = C  # paw reaches for trackpoint
+    f2[7][13] = Y; f2[8][13] = OR
+    save_frame(f2, "laptop_retro", 2)
+
+    # 3: Amber code rush
+    f3 = get_retro_base()
+    f3[8][10] = C; f3[8][13] = C
+    f3[6][13] = Y; f3[7][13] = Y; f3[8][13] = OR
+    save_frame(f3, "laptop_retro", 3)
+
+# ==========================================
+# 11d. Laptop Dual (Двухэкранный Fold — футуристичный dual-display)
+# ==========================================
+def gen_laptop_dual():
+    base = get_base_grid()
+    def get_dual_base():
+        f = [row[:] for row in base]
+        # Top screen (purple neon)
+        f[6][13] = PU; f[6][14] = PU
+        f[7][13] = PU; f[7][14] = PU
+        f[8][13] = CY; f[8][14] = PU
+        # Bottom screen replacing keyboard (cyan touch glass)
+        f[9][10] = CY; f[9][11] = CY; f[9][12] = CY; f[9][13] = CY; f[9][14] = PU
+        return f
+
+    # 0: Dual glass glow
+    f0 = get_dual_base()
+    f0[8][10] = C; f0[8][11] = C
+    save_frame(f0, "laptop_dual", 0)
+
+    # 1: Touch glass tap (ripple)
+    f1 = get_dual_base()
     f1[8][11] = C; f1[8][12] = C
-    f1[6][3] = W; f1[7][2] = W
-    save_frame(f1, "laptop_coffee", 1)
+    f1[9][11] = W; f1[9][12] = W  # touch flash
+    f1[7][13] = W
+    save_frame(f1, "laptop_dual", 1)
 
-    # 2: Picks up mug with left paw
-    f2 = [row[:] for row in base]
-    f2[7][13] = GR; f2[7][14] = GR
-    f2[8][13] = CY; f2[8][14] = GR
-    f2[9][11] = GR; f2[9][12] = GR; f2[9][13] = GR
-    f2[7][3] = BR; f2[7][4] = BR
-    f2[8][3] = BR; f2[8][4] = BR
-    f2[7][2] = BR  # handle
-    f2[8][5] = C   # paw holding mug
-    save_frame(f2, "laptop_coffee", 2)
+    # 2: Data stream between screens
+    f2 = get_dual_base()
+    f2[8][10] = C; f2[8][13] = C
+    f2[6][13] = CY; f2[7][13] = W
+    f2[9][12] = BL; f2[9][13] = BL
+    save_frame(f2, "laptop_dual", 2)
 
-    # 3: Takes a warm sip, peaceful content eyes
-    f3 = [row[:] for row in base]
-    f3[7][13] = GR; f3[7][14] = GR
-    f3[8][13] = CY; f3[8][14] = GR
-    f3[9][11] = GR; f3[9][12] = GR; f3[9][13] = GR
-    f3[6][4] = BR; f3[6][5] = BR  # mug to mouth level
-    f3[7][4] = BR; f3[7][5] = BR
-    f3[5][5] = CD; f3[5][10] = CD  # peaceful eyes
-    f3[6][3] = P; f3[6][11] = P    # warm blush
-    save_frame(f3, "laptop_coffee", 3)
+    # 3: Neon synergy
+    f3 = get_dual_base()
+    f3[8][11] = C; f3[8][12] = C
+    f3[7][13] = PU; f3[8][13] = W
+    f3[9][11] = CY; f3[9][12] = CY
+    save_frame(f3, "laptop_dual", 3)
 
-    # 4: Puts mug down, back to coding refreshed!
-    f4 = get_laptop_with_mug()
-    f4[8][11] = C; f4[8][12] = C
-    f4[7][13] = G; f4[8][13] = G  # fresh code flowing!
-    save_frame(f4, "laptop_coffee", 4)
+# ==========================================
+# 11e. Laptop RGB (Геймерский ноутбук с переливающейся RGB подсветкой)
+# ==========================================
+def gen_laptop_rgb():
+    base = get_base_grid()
+    def get_rgb_base(c1, c2, c3, c4):
+        f = [row[:] for row in base]
+        # Screen
+        f[7][13] = GR; f[7][14] = GR
+        f[8][13] = CY; f[8][14] = GR
+        # Dynamic rainbow RGB keyboard
+        f[9][10] = GR; f[9][11] = c1; f[9][12] = c2; f[9][13] = c3; f[9][14] = c4
+        return f
 
+    # 0: RGB wave: Red - Yellow - Green - Cyan
+    f0 = get_rgb_base(R, Y, G, CY)
+    f0[8][11] = C; f0[8][12] = C
+    f0[7][13] = W
+    save_frame(f0, "laptop_rgb", 0)
+
+    # 1: RGB wave: Green - Cyan - Blue - Purple
+    f1 = get_rgb_base(G, CY, BL, PU)
+    f1[8][10] = C; f1[8][12] = C
+    f1[8][13] = W
+    save_frame(f1, "laptop_rgb", 1)
+
+    # 2: RGB wave: Blue - Purple - Pink - Red
+    f2 = get_rgb_base(BL, PU, P, R)
+    f2[8][11] = C; f2[8][13] = C
+    f2[7][13] = CY; f2[8][13] = CY
+    save_frame(f2, "laptop_rgb", 2)
+
+    # 3: RGB wave: Purple - Pink - Red - Yellow + Cyber Reflection
+    f3 = get_rgb_base(PU, P, R, Y)
+    f3[8][11] = C; f3[8][12] = C
+    f3[7][13] = G; f3[8][13] = G
+    f3[4][13] = CY  # cyber reflection on head
+    save_frame(f3, "laptop_rgb", 3)
+
+# ==========================================
+# 11f. Laptop Cyberdeck (Портативная консоль / Кибердек прямо в лапках)
+# ==========================================
+def gen_laptop_cyberdeck():
+    base = get_base_grid()
+    def get_deck_base():
+        f = [row[:] for row in base]
+        # Handheld deck body held right in front (rows 7-9, cols 5-11)
+        f[7][4] = DG; f[7][11] = DG  # deck side grips
+        f[8][4] = DG; f[8][11] = DG
+        for x in range(5, 11):
+            f[9][x] = DG             # bottom frame
+        # Emerald matrix display (rows 7-8, cols 5-10)
+        for x in range(5, 11):
+            f[7][x] = G; f[8][x] = G
+        # Claude paws holding the deck sides firmly
+        f[8][3] = C; f[8][12] = C
+        return f
+
+    # 0: Left thumb button tap, cursor top left
+    f0 = get_deck_base()
+    f0[8][5] = C  # left thumb tapping
+    f0[7][6] = W
+    save_frame(f0, "laptop_cyberdeck", 0)
+
+    # 1: Right thumb button tap, cursor right
+    f1 = get_deck_base()
+    f1[8][10] = C  # right thumb tapping
+    f1[7][9] = W
+    save_frame(f1, "laptop_cyberdeck", 1)
+
+    # 2: Rapid dual-thumb typing!
+    f2 = get_deck_base()
+    f2[8][5] = C; f2[8][10] = C
+    f2[7][7] = W; f2[8][8] = W
+    save_frame(f2, "laptop_cyberdeck", 2)
+
+    # 3: Code stream on handheld screen
+    f3 = get_deck_base()
+    for x in (5, 7, 9):
+        f3[7][x] = GD; f3[8][x] = W
+    save_frame(f3, "laptop_cyberdeck", 3)
 # ==========================================
 # 12. Spin (Крутится 360°)
 # ==========================================
@@ -1062,10 +1157,13 @@ def main():
     gen_heart()
     gen_coffee()
     gen_idea()
-    gen_typing()       # Long, rich 12-frame coding session!
-    gen_laptop_think() # Debugging & eureka!
-    gen_laptop_hack()  # Turbo matrix hacker burst
-    gen_laptop_coffee()# Coding with coffee sip
+    gen_typing()            # Classic full coding session (12 frames)
+    gen_laptop_front()      # 1. Front-facing central laptop
+    gen_laptop_classic()    # 2. Sleek classic side ultrabook
+    gen_laptop_retro()      # 3. Vintage ThinkPad / amber terminal
+    gen_laptop_dual()       # 4. Dual-screen fold cyber laptop
+    gen_laptop_rgb()        # 5. Gamer RGB rainbow keyboard
+    gen_laptop_cyberdeck()  # 6. Handheld cyberdeck console
     gen_spin()
     gen_peek()
     gen_question()

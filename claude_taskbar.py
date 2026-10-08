@@ -639,37 +639,42 @@ class ClaudeTaskbarWidget(QWidget):
         # they strictly trigger when real Claude Code is coding!
         is_dev = self.smart_context_enabled and self._is_dev_window_active()
         if is_dev:
-            # Active in IDE/Terminal: high chance for matrix, wizard, idea, spark
+            # Active in IDE/Terminal: mostly everyday cute defaults, with occasional developer flashes
             all_choices = [
-                ("matrix", 20),
-                ("wizard", 18),
-                ("spark", 16),
-                ("idea", 16),
-                ("coffee", 14),
-                ("workout", 10),
-                ("dance", 8),
-                ("look_around", 8),
-                ("blink", 8),
-                ("shield", 6),
+                ("blink", 28),
+                ("look_around", 20),
+                ("dance", 18),
+                ("wave", 12),
+                ("coffee", 8),
+                ("spark", 8),
+                ("matrix", 6),
+                ("wizard", 5),
+                ("idea", 5),
+                ("workout", 3),
+                ("shield", 2),
             ]
         else:
-            # Cozy desktop pool: high variety, equalized chances, NO boring blink domination
+            # Cozy desktop: primarily default everyday movements (blink, look_around, dance, wave)
+            # Rare easter eggs have tiny 2-3% chance each!
             all_choices = [
-                ("matrix", 12),
-                ("wizard", 12),
-                ("workout", 10),
-                ("coffee", 10),
-                ("spark", 10),
-                ("idea", 10),
-                ("dance", 10),
-                ("chat", 10),
-                ("look_around", 10),
-                ("blink", 8),
-                ("peek", 8),
-                ("jump", 8),
-                ("heart", 8),
-                ("shield", 6),
-                ("question", 6),
+                ("blink", 35),        # Default: natural cute blinking
+                ("look_around", 24),  # Default: curious looking around
+                ("dance", 20),        # Default: cheerful little mascot dance
+                ("wave", 14),         # Default: friendly paw wave
+                ("coffee", 8),        # Cozy sip of coffee
+                ("spark", 8),         # Cute spark
+                # Rare easter eggs (occasional rare surprise):
+                ("matrix", 3),        # Rare cyber matrix stream
+                ("idea", 3),          # Rare idea bulb
+                ("peek", 3),          # Rare peek under taskbar
+                ("jump", 3),          # Rare bounce jump
+                ("heart", 3),         # Rare love heart
+                ("chat", 3),          # Rare thought bubble
+                ("wizard", 2),        # Rare wizard hat magic
+                ("workout", 2),       # Rare barbell workout
+                ("shield", 2),        # Rare energy shield
+                ("question", 2),      # Rare question mark
+                ("spin", 2),          # Rare 360 spin
             ]
 
         # Anti-repeat filter: exclude animations played in the last 4 rounds for maximum fresh variety!
@@ -695,6 +700,7 @@ class ClaudeTaskbarWidget(QWidget):
         # Precise speed per animation
         speeds = {
             "blink": 90,
+            "wave": 110,
             "matrix": 110,
             "wizard": 120,
             "workout": 110,
@@ -950,16 +956,18 @@ class ClaudeTaskbarWidget(QWidget):
     # --- Smart Context Logic (Claude Code, AFK Sleep, IDE Focus) ---
 
     LAPTOP_ANIMATIONS = [
-        ("typing", 110),         # Classic long coding session
-        ("laptop_hack", 85),      # Turbo matrix speed hacking
-        ("laptop_think", 130),    # Bug hunting & Eureka idea
-        ("laptop_coffee", 130),   # Coding with cozy coffee sip
+        ("laptop_front", 110, "💻 Фронтальный по центру"),
+        ("laptop_classic", 110, "💻 Классический ультрабук сбоку"),
+        ("laptop_retro", 110, "📟 Ретро-терминал ThinkPad"),
+        ("laptop_dual", 110, "📱 Двухэкранный Fold"),
+        ("laptop_rgb", 85, "🌈 Геймерский RGB"),
+        ("laptop_cyberdeck", 100, "🎮 Портативный Кибердек"),
     ]
 
     def _pick_next_laptop_anim(self):
-        anim, spd = self.LAPTOP_ANIMATIONS[self._current_laptop_anim_idx % len(self.LAPTOP_ANIMATIONS)]
+        item = self.LAPTOP_ANIMATIONS[self._current_laptop_anim_idx % len(self.LAPTOP_ANIMATIONS)]
         self._current_laptop_anim_idx += 1
-        return anim, spd
+        return item[0], item[1]
 
     def _poll_claude_code(self):
         """
@@ -1363,11 +1371,14 @@ class ClaudeTaskbarWidget(QWidget):
                 ("🛡️ Защитный купол (Shield)", "shield", 120, False),
                 ("🟢 Матрица / Хакер (Matrix)", "matrix", 120, True),
             ]),
-            ("💻 Ноутбук и Кодинг (4 стиля)", [
-                ("💻 Классический кодинг (Typing)", "typing", 110, True),
-                ("⚡ Турбо-хакинг матрицы (Hack)", "laptop_hack", 85, True),
-                ("🧠 Поиск бага и Эврика (Think)", "laptop_think", 130, True),
-                ("☕ Кодинг с глотком кофе (Coffee)", "laptop_coffee", 130, True),
+            ("💻 Ноутбук (6 вариантов формы)", [
+                ("💻 Фронтальный по центру (Front)", "laptop_front", 110, True),
+                ("💻 Классический ультрабук (Classic)", "laptop_classic", 110, True),
+                ("📟 Ретро-терминал ThinkPad (Retro)", "laptop_retro", 110, True),
+                ("📱 Двухэкранный Fold (Dual)", "laptop_dual", 110, True),
+                ("🌈 Геймерский RGB (Rainbow)", "laptop_rgb", 85, True),
+                ("🎮 Кибердек в лапках (Cyberdeck)", "laptop_cyberdeck", 100, True),
+                ("💻 Длинная сессия с билдом (Typing)", "typing", 110, True),
             ]),
             ("☕ Отдых и вдохновение", [
                 ("💡 Осенила идея (Idea)", "idea", 120, False),
