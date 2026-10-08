@@ -818,68 +818,290 @@ def gen_shield():
     save_frame(base, "shield", 6)
 
 # ==========================================
-# 23. Drag (Поднят и перетягивается в воздухе / Дрыгает ногами и руками)
+# 23. Drag Variants (Варианты анимаций при поднятии в воздух)
+# Без рта! Строго минималистичные аккуратные лапки (2-3px)
 # ==========================================
-def gen_drag():
-    def make_dangling_body(eye_dir=0):
-        g = make_empty_grid()
-        # Pinch at scruff
-        g[3][7] = C; g[3][8] = C
-        # Head
-        for x in range(4, 12):
-            g[4][x] = C
-            g[5][x] = C
-        # Surprised wide eyes
-        if eye_dir == 0:
-            g[5][5] = E; g[5][10] = E
-            g[4][5] = CD; g[4][10] = CD
-        elif eye_dir == -1: # looking down-left
-            g[5][4] = E; g[5][9] = E
-            g[4][4] = CD; g[4][9] = CD
-        else: # looking down-right
-            g[5][6] = E; g[5][11] = E
-            g[4][6] = CD; g[4][11] = CD
-        # Open surprised mouth
-        g[6][7] = E; g[6][8] = E
-        # Torso
-        for y in (6, 7, 8):
-            for x in range(4, 12):
-                if g[y][x] == T:
-                    g[y][x] = C
-        return g
+def make_lifted_head_torso(eye_mode="surprised", sweat=False, tilt=0):
+    """
+    Constructs Claude's lifted head and torso.
+    ABSOLUTELY NO MOUTH. Pure solid Claude body with cute expressive eyes.
+    Lifted by 2px up so head starts at row 3.
+    """
+    g = make_empty_grid()
+    
+    # Row 2: scruff pinch / top hair tuft
+    if tilt == -1:
+        g[2][6] = C; g[2][7] = C
+    elif tilt == 1:
+        g[2][8] = C; g[2][9] = C
+    else:
+        g[2][7] = C; g[2][8] = C
 
-    # Frame 0: Left arm UP, Right arm DOWN; Left leg kicked forward, Right leg down
-    f0 = make_dangling_body(-1)
-    f0[5][2] = C; f0[5][3] = C; f0[6][2] = C; f0[6][3] = C
-    f0[7][12] = C; f0[7][13] = C; f0[8][12] = C; f0[8][13] = C
-    f0[9][5] = C; f0[9][6] = C; f0[10][4] = C; f0[10][5] = C; f0[11][3] = C; f0[11][4] = C
-    f0[9][9] = C; f0[9][10] = C; f0[10][9] = C; f0[10][10] = C; f0[11][10] = C; f0[12][10] = C
+    # Row 3: head top
+    for x in range(4, 12):
+        g[3][x] = C
+
+    # Row 4: eyes row
+    for x in range(4, 12):
+        g[4][x] = C
+
+    if eye_mode == "surprised":
+        # Round surprised eyes, NO MOUTH
+        g[4][5] = E; g[4][10] = E
+        g[3][5] = CD; g[3][10] = CD
+    elif eye_mode == "squint":
+        # Determined / grumpy squint (> <)
+        g[4][5] = E; g[4][6] = E; g[4][9] = E; g[4][10] = E
+    elif eye_mode == "look_down":
+        # Looking down at floor
+        g[4][5] = C; g[4][10] = C
+        g[5][5] = E; g[5][10] = E
+    elif eye_mode == "blink":
+        # Soft closed eyes (cute horizontal line)
+        g[4][5] = CD; g[4][10] = CD
+    else:
+        # Default dot eyes
+        g[4][5] = E; g[4][10] = E
+
+    # Row 5: cheeks / upper torso (SOLID, NO MOUTH!)
+    for x in range(4, 12):
+        g[5][x] = C
+    if eye_mode in ("surprised", "look_down"):
+        g[5][4] = P; g[5][11] = P # cute blush
+
+    # Row 6: solid mid torso (SOLID, NO MOUTH!)
+    for x in range(4, 12):
+        g[6][x] = C
+
+    # Row 7: solid lower torso (SOLID, NO MOUTH!)
+    for x in range(4, 12):
+        g[7][x] = C
+
+    if sweat:
+        g[2][13] = CY; g[3][13] = CY
+
+    return g
+
+# 1. Pedal (Велосипедик — активный перебор ножками)
+def gen_drag_pedal():
+    f0 = make_lifted_head_torso("surprised", sweat=True)
+    f0[5][2] = C; f0[5][3] = C
+    f0[7][12] = C; f0[7][13] = C
+    f0[8][5] = C; f0[8][6] = C; f0[9][5] = C
+    f0[8][9] = C; f0[8][10] = C; f0[9][10] = C; f0[10][10] = C; f0[11][10] = C
+    save_frame(f0, "drag_pedal", 0)
     save_frame(f0, "drag", 0)
 
-    # Frame 1: Left arm MID, Right arm UP; Legs cycling
-    f1 = make_dangling_body(0)
-    f1[6][2] = C; f1[6][3] = C; f1[7][2] = C; f1[7][3] = C
-    f1[5][12] = C; f1[5][13] = C; f1[6][12] = C; f1[6][13] = C
-    f1[9][5] = C; f1[9][6] = C; f1[10][5] = C; f1[10][6] = C; f1[11][5] = C
-    f1[9][9] = C; f1[9][10] = C; f1[10][9] = C; f1[10][10] = C; f1[11][8] = C
+    f1 = make_lifted_head_torso("surprised", sweat=False)
+    f1[6][2] = C; f1[6][3] = C
+    f1[6][12] = C; f1[6][13] = C
+    f1[8][5] = C; f1[8][6] = C; f1[9][5] = C; f1[10][5] = C; f1[11][5] = C
+    f1[8][9] = C; f1[8][10] = C; f1[9][9] = C
+    save_frame(f1, "drag_pedal", 1)
     save_frame(f1, "drag", 1)
 
-    # Frame 2: Left arm DOWN, Right arm MID; Right leg kicked forward, Left leg down
-    f2 = make_dangling_body(1)
-    f2[7][2] = C; f2[7][3] = C; f2[8][2] = C; f2[8][3] = C
-    f2[6][12] = C; f2[6][13] = C; f2[7][12] = C; f2[7][13] = C
-    f2[9][5] = C; f2[9][6] = C; f2[10][5] = C; f2[10][6] = C; f2[11][5] = C; f2[12][5] = C
-    f2[9][9] = C; f2[9][10] = C; f2[10][10] = C; f2[10][11] = C; f2[11][11] = C; f2[11][12] = C
+    f2 = make_lifted_head_torso("surprised", sweat=True)
+    f2[7][2] = C; f2[7][3] = C
+    f2[5][12] = C; f2[5][13] = C
+    f2[8][5] = C; f2[8][6] = C; f2[9][6] = C
+    f2[8][9] = C; f2[8][10] = C; f2[9][10] = C; f2[10][10] = C; f2[11][11] = C
+    save_frame(f2, "drag_pedal", 2)
     save_frame(f2, "drag", 2)
 
-    # Frame 3: Left arm UP, Right arm DOWN; bicycle kick splay + sweat drop
-    f3 = make_dangling_body(0)
-    f3[5][2] = C; f3[5][3] = C; f3[6][2] = C; f3[6][3] = C
-    f3[7][12] = C; f3[7][13] = C; f3[8][12] = C; f3[8][13] = C
-    f3[9][5] = C; f3[9][6] = C; f3[10][4] = C; f3[10][5] = C; f3[11][4] = C
-    f3[9][9] = C; f3[9][10] = C; f3[10][10] = C; f3[10][11] = C; f3[11][10] = C
-    f3[3][13] = CY
+    f3 = make_lifted_head_torso("surprised", sweat=False)
+    f3[6][2] = C; f3[6][3] = C
+    f3[6][12] = C; f3[6][13] = C
+    f3[8][5] = C; f3[8][6] = C; f3[9][5] = C; f3[10][6] = C
+    f3[8][9] = C; f3[8][10] = C; f3[9][10] = C
+    save_frame(f3, "drag_pedal", 3)
     save_frame(f3, "drag", 3)
+
+# 2. Flail (Забавная паника / Быстрое барахтанье)
+def gen_drag_flail():
+    f0 = make_lifted_head_torso("surprised", sweat=True)
+    f0[5][2] = C; f0[5][3] = C
+    f0[5][12] = C; f0[5][13] = C
+    f0[8][4] = C; f0[9][3] = C; f0[10][3] = C
+    f0[8][6] = C; f0[9][6] = C
+    f0[8][9] = C; f0[9][9] = C
+    f0[8][11] = C; f0[9][12] = C; f0[10][12] = C
+    save_frame(f0, "drag_flail", 0)
+
+    f1 = make_lifted_head_torso("surprised", sweat=False)
+    f1[7][2] = C; f1[7][3] = C
+    f1[7][12] = C; f1[7][13] = C
+    f1[8][6] = C; f1[8][7] = C; f1[8][8] = C; f1[8][9] = C
+    f1[9][6] = C; f1[9][7] = C; f1[9][8] = C; f1[9][9] = C
+    f1[10][7] = C; f1[10][8] = C
+    save_frame(f1, "drag_flail", 1)
+
+    f2 = make_lifted_head_torso("surprised", sweat=True)
+    f2[6][2] = C; f2[6][3] = C
+    f2[6][12] = C; f2[6][13] = C
+    f2[8][5] = C; f2[9][4] = C; f2[10][4] = C
+    f2[8][6] = C; f2[9][6] = C; f2[10][5] = C
+    f2[8][9] = C; f2[9][9] = C; f2[10][10] = C
+    f2[8][10] = C; f2[9][11] = C; f2[10][11] = C
+    save_frame(f2, "drag_flail", 2)
+
+    f3 = make_lifted_head_torso("surprised", sweat=False)
+    f3[5][2] = C; f3[5][3] = C
+    f3[7][12] = C; f3[7][13] = C
+    f3[8][5] = C; f3[9][5] = C
+    f3[8][7] = C; f3[9][7] = C
+    f3[8][8] = C; f3[9][8] = C
+    f3[8][10] = C; f3[9][10] = C
+    save_frame(f3, "drag_flail", 3)
+
+# 3. Swing (Качели / Маятник — плавные покачивания)
+def gen_drag_swing():
+    f0 = make_lifted_head_torso("look_down", tilt=-1)
+    f0[6][2] = C; f0[6][3] = C
+    f0[6][12] = C; f0[6][13] = C
+    f0[8][4] = C; f0[9][3] = C; f0[10][3] = C
+    f0[8][6] = C; f0[9][5] = C; f0[10][5] = C
+    f0[8][9] = C; f0[9][8] = C; f0[10][8] = C
+    f0[8][11] = C; f0[9][10] = C; f0[10][10] = C
+    save_frame(f0, "drag_swing", 0)
+
+    f1 = make_lifted_head_torso("look_down", tilt=0)
+    f1[6][2] = C; f1[6][3] = C
+    f1[6][12] = C; f1[6][13] = C
+    f1[8][4] = C; f1[9][4] = C; f1[10][4] = C
+    f1[8][6] = C; f1[9][6] = C; f1[10][6] = C
+    f1[8][9] = C; f1[9][9] = C; f1[10][9] = C
+    f1[8][11] = C; f1[9][11] = C; f1[10][11] = C
+    save_frame(f1, "drag_swing", 1)
+
+    f2 = make_lifted_head_torso("look_down", tilt=1)
+    f2[6][2] = C; f2[6][3] = C
+    f2[6][12] = C; f2[6][13] = C
+    f2[8][4] = C; f2[9][5] = C; f2[10][5] = C
+    f2[8][6] = C; f2[9][7] = C; f2[10][7] = C
+    f2[8][9] = C; f2[9][10] = C; f2[10][10] = C
+    f2[8][11] = C; f2[9][12] = C; f2[10][12] = C
+    save_frame(f2, "drag_swing", 2)
+
+    f3 = make_lifted_head_torso("look_down", tilt=0)
+    f3[6][2] = C; f3[6][3] = C
+    f3[6][12] = C; f3[6][13] = C
+    f3[8][4] = C; f3[9][4] = C; f3[10][4] = C
+    f3[8][6] = C; f3[9][6] = C; f3[10][6] = C
+    f3[8][9] = C; f3[9][9] = C; f3[10][9] = C
+    f3[8][11] = C; f3[9][11] = C; f3[10][11] = C
+    save_frame(f3, "drag_swing", 3)
+
+# 4. Frog (Лягушонок — поджать лапки и толкнуться)
+def gen_drag_frog():
+    f0 = make_lifted_head_torso("squint", sweat=False)
+    f0[6][3] = C; f0[6][4] = C
+    f0[6][11] = C; f0[6][12] = C
+    f0[8][4] = C; f0[8][5] = C; f0[8][6] = C
+    f0[8][9] = C; f0[8][10] = C; f0[8][11] = C
+    save_frame(f0, "drag_frog", 0)
+
+    f1 = make_lifted_head_torso("squint", sweat=True)
+    f1[5][2] = C; f1[5][3] = C
+    f1[5][12] = C; f1[5][13] = C
+    f1[8][4] = C; f1[9][4] = C; f1[10][4] = C; f1[11][4] = C
+    f1[8][6] = C; f1[9][6] = C; f1[10][6] = C; f1[11][6] = C
+    f1[8][9] = C; f1[9][9] = C; f1[10][9] = C; f1[11][9] = C
+    f1[8][11] = C; f1[9][11] = C; f1[10][11] = C; f1[11][11] = C
+    save_frame(f1, "drag_frog", 1)
+
+    f2 = make_lifted_head_torso("squint", sweat=False)
+    f2[6][2] = C; f2[6][3] = C
+    f2[6][12] = C; f2[6][13] = C
+    f2[8][4] = C; f2[9][4] = C; f2[10][4] = C
+    f2[8][6] = C; f2[9][6] = C; f2[10][6] = C
+    f2[8][9] = C; f2[9][9] = C; f2[10][9] = C
+    f2[8][11] = C; f2[9][11] = C; f2[10][11] = C
+    save_frame(f2, "drag_frog", 2)
+
+    f3 = make_lifted_head_torso("squint", sweat=False)
+    f3[6][3] = C; f3[6][4] = C
+    f3[6][11] = C; f3[6][12] = C
+    f3[8][4] = C; f3[9][5] = C
+    f3[8][6] = C; f3[9][6] = C
+    f3[8][9] = C; f3[9][9] = C
+    f3[8][11] = C; f3[9][10] = C
+    save_frame(f3, "drag_frog", 3)
+
+# 5. Scruff (За шкирку / Котёнок свесил лапки)
+def gen_drag_scruff():
+    f0 = make_lifted_head_torso("surprised", tilt=-1)
+    f0[7][2] = C; f0[7][3] = C
+    f0[7][12] = C; f0[7][13] = C
+    f0[8][4] = C; f0[9][4] = C; f0[10][3] = C
+    f0[8][6] = C; f0[9][6] = C; f0[10][5] = C
+    f0[8][9] = C; f0[9][9] = C; f0[10][8] = C
+    f0[8][11] = C; f0[9][11] = C; f0[10][10] = C
+    save_frame(f0, "drag_scruff", 0)
+
+    f1 = make_lifted_head_torso("surprised", tilt=0)
+    f1[7][2] = C; f1[7][3] = C
+    f1[7][12] = C; f1[7][13] = C
+    f1[8][4] = C; f1[9][4] = C; f1[10][4] = C
+    f1[8][6] = C; f1[9][6] = C; f1[10][6] = C
+    f1[8][9] = C; f1[9][9] = C; f1[10][9] = C
+    f1[8][11] = C; f1[9][11] = C; f1[10][11] = C
+    save_frame(f1, "drag_scruff", 1)
+
+    f2 = make_lifted_head_torso("surprised", tilt=1)
+    f2[7][2] = C; f2[7][3] = C
+    f2[7][12] = C; f2[7][13] = C
+    f2[8][4] = C; f2[9][4] = C; f2[10][5] = C
+    f2[8][6] = C; f2[9][6] = C; f2[10][7] = C
+    f2[8][9] = C; f2[9][9] = C; f2[10][10] = C
+    f2[8][11] = C; f2[9][11] = C; f2[10][12] = C
+    save_frame(f2, "drag_scruff", 2)
+
+    f3 = make_lifted_head_torso("blink", tilt=0)
+    f3[7][2] = C; f3[7][3] = C
+    f3[7][12] = C; f3[7][13] = C
+    f3[8][4] = C; f3[9][4] = C; f3[10][4] = C
+    f3[8][6] = C; f3[9][6] = C; f3[10][6] = C
+    f3[8][9] = C; f3[9][9] = C; f3[10][9] = C
+    f3[8][11] = C; f3[9][11] = C; f3[10][11] = C
+    save_frame(f3, "drag_scruff", 3)
+
+# 6. Run (Мультяшный спринт в воздухе)
+def gen_drag_run():
+    f0 = make_lifted_head_torso("surprised", sweat=True)
+    f0[5][2] = C; f0[5][3] = C
+    f0[7][12] = C; f0[7][13] = C
+    f0[8][5] = C; f0[9][4] = C; f0[10][3] = C
+    f0[8][6] = C; f0[9][5] = C; f0[10][4] = C
+    f0[8][9] = C; f0[9][10] = C; f0[10][11] = C
+    f0[8][10] = C; f0[9][11] = C; f0[10][12] = C
+    save_frame(f0, "drag_run", 0)
+
+    f1 = make_lifted_head_torso("surprised", sweat=False)
+    f1[6][2] = C; f1[6][3] = C
+    f1[6][12] = C; f1[6][13] = C
+    f1[8][4] = C; f1[9][4] = C; f1[10][5] = C
+    f1[8][6] = C; f1[9][6] = C
+    f1[8][9] = C; f1[9][9] = C
+    f1[8][11] = C; f1[9][11] = C; f1[10][10] = C
+    save_frame(f1, "drag_run", 1)
+
+    f2 = make_lifted_head_torso("surprised", sweat=True)
+    f2[7][2] = C; f2[7][3] = C
+    f2[5][12] = C; f2[5][13] = C
+    f2[8][5] = C; f2[9][4] = C; f2[10][3] = C
+    f2[8][9] = C; f2[9][10] = C; f2[10][11] = C
+    f2[8][10] = C; f2[9][11] = C; f2[10][12] = C
+    save_frame(f2, "drag_run", 2)
+
+    f3 = make_lifted_head_torso("surprised", sweat=False)
+    f3[6][2] = C; f3[6][3] = C
+    f3[6][12] = C; f3[6][13] = C
+    f3[8][5] = C; f3[9][5] = C; f3[10][6] = C
+    f3[8][6] = C; f3[9][6] = C
+    f3[8][9] = C; f3[9][9] = C
+    f3[8][10] = C; f3[9][10] = C
+    f3[10][9] = C
+    save_frame(f3, "drag_run", 3)
 
 # ==========================================
 # 24. Land (Приземление на пол после перетаскивания)
@@ -935,8 +1157,13 @@ def main():
     gen_chat()
     gen_shield()
 
-    # Physics / Interactive Drag & Land
-    gen_drag()
+    # Physics / Interactive Drag & Land (6 вариантов поднятия + приземление)
+    gen_drag_pedal()
+    gen_drag_flail()
+    gen_drag_swing()
+    gen_drag_frog()
+    gen_drag_scruff()
+    gen_drag_run()
     gen_land()
 
     count = len([f for f in os.listdir(OUTPUT_DIR) if f.endswith(".png")])

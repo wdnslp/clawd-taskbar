@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Варианты Анимации Поднятия Клода (Drag Showcase)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0d13;
+      --surface: #131722;
+      --surface-card: #181c2b;
+      --surface-hover: #20263a;
+      --border: #262c3e;
+      --border-glow: rgba(218, 119, 88, 0.4);
+      --primary: #DA7758;
+      --primary-light: #e58769;
+      --primary-glow: rgba(218, 119, 88, 0.35);
+      --text: #f0f3fa;
+      --text-muted: #949db3;
+      --text-dim: #656d82;
+      --accent-green: #3dd68c;
+      --accent-blue: #4daafc;
+      --accent-purple: #b37feb;
+      --accent-gold: #ffc53d;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(218, 119, 88, 0.12), transparent 45%),
+        radial-gradient(circle at 10% 20%, rgba(77, 170, 252, 0.05), transparent 30%),
+        radial-gradient(circle at 90% 70%, rgba(179, 127, 235, 0.05), transparent 30%);
+      padding: 32px 24px 64px;
+      overflow-x: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+    }
+
+    /* HEADER */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-icon {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, rgba(218, 119, 88, 0.25), rgba(218, 119, 88, 0.05));
+      border: 1px solid var(--border-glow);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(218, 119, 88, 0.2);
+    }
+
+    .brand-icon img {
+      width: 40px;
+      height: 40px;
+      image-rendering: pixelated;
+    }
+
+    .brand-titles h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #ffffff, #f0f3fa 40%, var(--primary-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-titles p {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 3px;
+    }
+
+    .rules-badge-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      border: 1px solid transparent;
+    }
+
+    .badge-no-mouth {
+      background: rgba(61, 214, 140, 0.12);
+      border-color: rgba(61, 214, 140, 0.3);
+      color: var(--accent-green);
+    }
+
+    .badge-stubby-paws {
+      background: rgba(218, 119, 88, 0.12);
+      border-color: var(--border-glow);
+      color: var(--primary-light);
+    }
+
+    .badge-interactive {
+      background: rgba(77, 170, 252, 0.12);
+      border-color: rgba(77, 170, 252, 0.3);
+      color: var(--accent-blue);
+    }
+
+    /* SIMULATOR HERO SECTION */
+    .simulator-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .simulator-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .sim-info h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .sim-info p {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+
+    .sim-badge-notice {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 8px;
+      background: rgba(218, 119, 88, 0.15);
+      border: 1px solid rgba(218, 119, 88, 0.3);
+      border-radius: 4px;
+      font-size: 11.5px;
+      color: var(--primary-light);
+      font-weight: 600;
+    }
+
+    /* INTERACTIVE STAGE CANVAS */
+    .sim-stage-area {
+      background: #090b10;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      height: 200px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      user-select: none;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6);
+      cursor: default;
+    }
+
+    .sim-stage-area.dragging-cursor {
+      cursor: grabbing;
+    }
+
+    /* Simulated Taskbar Ledge */
+    .sim-taskbar-bar {
+      width: 100%;
+      height: 48px;
+      background: rgba(22, 26, 38, 0.95);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      justify-content: space-between;
+      z-index: 5;
+    }
+
+    .sim-taskbar-icons {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .sim-win-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.85;
+    }
+
+    .sim-hint-bubble {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(24, 28, 43, 0.9);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      pointer-events: none;
+      transition: opacity 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .sim-hint-bubble b {
+      color: var(--primary-light);
+    }
+
+    /* Interactive Draggable Mascot Element */
+    .sim-mascot {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      bottom: 0px;
+      left: 300px;
+      cursor: grab;
+      z-index: 10;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .sim-mascot:active {
+      cursor: grabbing;
+    }
+
+    .sim-mascot canvas {
+      width: 48px;
+      height: 48px;
+      image-rendering: pixelated;
+    }
+
+    .sim-shadow {
+      position: absolute;
+      bottom: 2px;
+      width: 32px;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 50%;
+      left: 8px;
+      z-index: 4;
+      pointer-events: none;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+
+    /* GRID OF VARIANTS */
+    .section-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .variants-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+    }
+
+    .variant-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .variant-card:hover {
+      border-color: var(--border-glow);
+      background: var(--surface-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .variant-card.selected {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-glow), 0 12px 32px rgba(218, 119, 88, 0.15);
+      background: var(--surface-card);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .card-header-text h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-header-text p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .card-tag {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-dim);
+    }
+
+    /* Canvas Display Box */
+    .card-viewport {
+      background: #090a0f;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-sm);
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(218, 119, 88, 0.06), transparent 60%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 16px 16px, 16px 16px;
+    }
+
+    .card-viewport canvas {
+      width: 96px;
+      height: 96px;
+      image-rendering: pixelated;
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
+    }
+
+    /* Card Details & Actions */
+    .card-details {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.45;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px 12px;
+      border-radius: 6px;
+      border-left: 3px solid var(--primary);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-light);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-select-active {
+      background: rgba(61, 214, 140, 0.15);
+      border-color: rgba(61, 214, 140, 0.4);
+      color: var(--accent-green);
+    }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 13px;
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    footer a {
+      color: var(--primary-light);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- HEADER -->
+    <header>
+      <div class="brand-wrap">
+        <div class="brand-icon">
+          <img src="base.png" alt="Claude Mascot">
+        </div>
+        <div class="brand-titles">
+          <h1>Варианты Анимации Поднятия Клода</h1>
+          <p>6 уникальных концептов дрыгания ножками и лапками при отрыве от таскбара</p>
+        </div>
+      </div>
+
+      <div class="rules-badge-group">
+        <span class="badge badge-no-mouth">✓ Без рта (канон)</span>
+        <span class="badge badge-stubby-paws">✓ Короткие лапки 2-3px</span>
+        <span class="badge badge-interactive">🎮 Интерактивный тест</span>
+      </div>
+    </header>
+
+    <!-- INTERACTIVE SIMULATOR (TRY IT HERE) -->
+    <section class="simulator-card">
+      <div class="simulator-header">
+        <div class="sim-info">
+          <h2>🎮 Интерактивная Песочница (Потяните Клода мышкой!)</h2>
+          <p>Проверьте физику прямо в браузере: если тянуть горизонтально по полу — Клод <b>упирается</b>. Чтобы поднять его, потяните <b>ВВЕРХ</b> — он оторвётся от пола и начнёт дрыгать ножками!</p>
+          <span id="simSelectedBadge" class="sim-badge-notice">Текущий стиль: 🚴 1. Велосипедик (drag_pedal)</span>
+        </div>
+      </div>
+
+      <div id="stageArea" class="sim-stage-area">
+        <div id="simHint" class="sim-hint-bubble">
+          <span>👆 Зажмите Клода и потяните <b>вверх</b>!</span>
+        </div>
+
+        <div id="mascotShadow" class="sim-shadow"></div>
+
+        <div id="simMascot" class="sim-mascot">
+          <canvas id="simCanvas" width="16" height="16"></canvas>
+        </div>
+
+        <div class="sim-taskbar-bar">
+          <div class="sim-taskbar-icons">
+            <div class="sim-win-icon" style="background:#0078d4;">🪟</div>
+            <div class="sim-win-icon" style="background:#2b2f3a;">📁</div>
+            <div class="sim-win-icon" style="background:#e81123;">▶</div>
+            <div class="sim-win-icon" style="background:#107c41;">📊</div>
+          </div>
+          <span style="font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono';">Shell_TrayWnd (48px)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION TITLE -->
+    <div class="section-title-row">
+      <h2 class="section-title">Каталог всех 6 вариантов анимации</h2>
+      <span style="font-size: 13px; color: var(--text-muted);">Нажмите <b>«Выбрать для теста»</b>, чтобы опробовать в песочнице выше</span>
+    </div>
+
+    <!-- VARIANTS GRID -->
+    <div class="variants-grid" id="variantsGrid"></div>
+
+    <footer>
+      <p>Claude Pixel Taskbar Mascot • Все анимации строго 16x16 без растягивания лапок • Разработано для Windows 11</p>
+      <p style="margin-top: 6px;"><a href="showcase.html">← Перейти в полную галерею (23 анимации)</a></p>
+    </footer>
+  </div>
+
+  <script>
+    const VARIANTS = [
+      {
+        id: "drag_pedal",
+        name: "Велосипедик",
+        emoji: "🚴",
+        tag: "ДИНАМИЧНЫЙ",
+        desc: "Клод быстро перебирает ножками в воздухе по круговой траектории («крутит педали»). Короткие лапки поочерёдно балансируют вверх и вниз. На лбу капелька пота от удивления.",
+        speed: 85,
+        frames: 4
+      },
+      {
+        id: "drag_flail",
+        name: "Забавная паника",
+        emoji: "⚡",
+        tag: "ЭКСПРЕССИВНЫЙ",
+        desc: "Ножки синхронно разлетаются в стороны веером, затем прижимаются вместе к центру. Лапки мелко трепещут от неожиданности. Круглые удивлённые глазки без рта.",
+        speed: 80,
+        frames: 4
+      },
+      {
+        id: "drag_swing",
+        name: "Качели / Маятник",
+        emoji: "🎪",
+        tag: "УЮТНЫЙ & ЛЮБОПЫТНЫЙ",
+        desc: "Клод плавно раскачивает ножками влево-вправо, как маятник. Глазки опущены вниз — он с любопытством смотрит, как высоко оторвался от пола панели задач.",
+        speed: 110,
+        frames: 4
+      },
+      {
+        id: "drag_frog",
+        name: "Лягушонок",
+        emoji: "🐸",
+        tag: "УПРЯМЫЙ",
+        desc: "Клод поджимает все лапки к животику, нахмуривает глазки (> <) и с силой отталкивается ножками вниз. Очень характерная и смешная анимация сопротивления.",
+        speed: 100,
+        frames: 4
+      },
+      {
+        id: "drag_scruff",
+        name: "За шкирку",
+        emoji: "🐱",
+        tag: "МИЛЫЙ / КОТЁНОК",
+        desc: "Полная покорность судьбе: Клод безропотно свесил короткие лапки вниз, слегка покачивается от гравитации и невинно моргает глазками прямо в полёте.",
+        speed: 115,
+        frames: 4
+      },
+      {
+        id: "drag_run",
+        name: "Мультяшный спринт",
+        emoji: "🏃",
+        tag: "КОМЕДИЙНЫЙ",
+        desc: "Классический мультяшный бег на месте в невесомости: ножки совершают широкий спринтерский шаг в воздухе, а кулачки работают в такт бега.",
+        speed: 80,
+        frames: 4
+      }
+    ];
+
+    let currentSelectedVariant = VARIANTS[0];
+
+    // Preloaded image caches
+    const variantFrames = {};
+    let landFrames = [];
+    let idleFrame = null;
+
+    function preloadAll() {
+      // Idle
+      idleFrame = new Image();
+      idleFrame.src = "base.png";
+
+      // Land
+      for (let i = 0; i < 2; i++) {
+        const img = new Image();
+        img.src = `animations/land_${String(i).padStart(2, '0')}.png`;
+        landFrames.push(img);
+      }
+
+      // Variants
+      VARIANTS.forEach(v => {
+        variantFrames[v.id] = [];
+        for (let i = 0; i < v.frames; i++) {
+          const img = new Image();
+          img.src = `animations/${v.id}_${String(i).padStart(2, '0')}.png`;
+          variantFrames[v.id].push(img);
+        }
+      });
+    }
+
+    // Build Cards Grid
+    function renderGrid() {
+      const grid = document.getElementById('variantsGrid');
+      grid.innerHTML = '';
+
+      VARIANTS.forEach((v, idx) => {
+        const card = document.createElement('div');
+        card.className = `variant-card ${v.id === currentSelectedVariant.id ? 'selected' : ''}`;
+        card.id = `card_${v.id}`;
+
+        card.innerHTML = `
+          <div class="card-top">
+            <div class="card-header-text">
+              <h3>${v.emoji} ${idx + 1}. ${v.name}</h3>
+              <p>${v.frames} кадра • ${v.speed} мс/кадр</p>
+            </div>
+            <span class="card-tag">${v.tag}</span>
+          </div>
+
+          <div class="card-viewport">
+            <canvas id="canvas_${v.id}" width="16" height="16"></canvas>
+          </div>
+
+          <div class="card-details">
+            ${v.desc}
+          </div>
+
+          <div class="card-actions">
+            <button class="btn ${v.id === currentSelectedVariant.id ? 'btn-select-active' : 'btn-primary'}" onclick="selectVariant('${v.id}')">
+              ${v.id === currentSelectedVariant.id ? '✓ Выбран для теста' : 'Выбрать для теста'}
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+
+        // Start card canvas animation loop
+        animateCardCanvas(v);
+      });
+    }
+
+    function animateCardCanvas(variant) {
+      const cvs = document.getElementById(`canvas_${variant.id}`);
+      if (!cvs) return;
+      const ctx = cvs.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+
+      let fIdx = 0;
+      setInterval(() => {
+        const frames = variantFrames[variant.id];
+        if (frames && frames[fIdx] && frames[fIdx].complete) {
+          ctx.clearRect(0, 0, 16, 16);
+          ctx.drawImage(frames[fIdx], 0, 0);
+        }
+        fIdx = (fIdx + 1) % variant.frames;
+      }, variant.speed);
+    }
+
+    function selectVariant(id) {
+      const found = VARIANTS.find(v => v.id === id);
+      if (!found) return;
+      currentSelectedVariant = found;
+
+      document.getElementById('simSelectedBadge').textContent = `Текущий стиль: ${found.emoji} ${found.name} (${found.id})`;
+
+      // Update card styles
+      document.querySelectorAll('.variant-card').forEach(c => c.classList.remove('selected'));
+      const activeCard = document.getElementById(`card_${id}`);
+      if (activeCard) activeCard.classList.add('selected');
+
+      renderGrid();
+    }
+
+    // ==========================================
+    // INTERACTIVE SIMULATOR LOGIC
+    // ==========================================
+    const simStage = document.getElementById('stageArea');
+    const simMascot = document.getElementById('simMascot');
+    const simShadow = document.getElementById('mascotShadow');
+    const simCanvas = document.getElementById('simCanvas');
+    const simCtx = simCanvas.getContext('2d');
+    simCtx.imageSmoothingEnabled = false;
+
+    let mascotX = 300;
+    let mascotY = 0; // 0 = floor
+    let isMouseDown = false;
+    let isLifted = false;
+    let dragStartY = 0;
+    let dragStartX = 0;
+    let mascotStartX = 300;
+    let simAnimTimer = null;
+    let simFrameIdx = 0;
+
+    function drawSimImage(img) {
+      if (img && img.complete) {
+        simCtx.clearRect(0, 0, 16, 16);
+        simCtx.drawImage(img, 0, 0);
+      }
+    }
+
+    function updateMascotDom() {
+      simMascot.style.left = `${mascotX}px`;
+      simMascot.style.bottom = `${mascotY}px`;
+      simShadow.style.left = `${mascotX + 8}px`;
+
+      // Scale shadow as Claude lifts up
+      const liftFactor = Math.max(0, Math.min(1, mascotY / 50));
+      simShadow.style.transform = `scale(${1 - liftFactor * 0.4})`;
+      simShadow.style.opacity = `${0.4 - liftFactor * 0.25}`;
+    }
+
+    function playSimDragAnimation() {
+      clearInterval(simAnimTimer);
+      simFrameIdx = 0;
+      simAnimTimer = setInterval(() => {
+        const frames = variantFrames[currentSelectedVariant.id];
+        if (frames && frames.length) {
+          drawSimImage(frames[simFrameIdx % frames.length]);
+          simFrameIdx++;
+        }
+      }, currentSelectedVariant.speed);
+    }
+
+    function playSimLandAnimation() {
+      clearInterval(simAnimTimer);
+      if (landFrames[0]) drawSimImage(landFrames[0]);
+      setTimeout(() => {
+        if (landFrames[1]) drawSimImage(landFrames[1]);
+        setTimeout(() => {
+          drawSimImage(idleFrame);
+        }, 120);
+      }, 100);
+    }
+
+    // Mouse events on mascot
+    simMascot.addEventListener('mousedown', (e) => {
+      isMouseDown = true;
+      isLifted = false;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      mascotStartX = mascotX;
+      simStage.classList.add('dragging-cursor');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isMouseDown) return;
+
+      const deltaX = e.clientX - dragStartX;
+      const deltaY = e.clientY - dragStartY;
+
+      // RULE: Must pull UP by at least 10px to lift!
+      if (!isLifted) {
+        if (deltaY <= -10) {
+          isLifted = true;
+          document.getElementById('simHint').style.opacity = '0';
+          playSimDragAnimation();
+        } else {
+          // If only horizontal or downward: resist on floor!
+          return;
+        }
+      }
+
+      if (isLifted) {
+        // Move horizontally
+        const stageW = simStage.clientWidth;
+        mascotX = Math.max(10, Math.min(stageW - 58, mascotStartX + deltaX));
+
+        // Lift upward visually (from 0 up to 70px in stage)
+        const liftUp = Math.max(15, Math.min(70, -deltaY));
+        mascotY = liftUp;
+
+        updateMascotDom();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+      simStage.classList.remove('dragging-cursor');
+
+      if (isLifted) {
+        // Drop back down to floor with squish land!
+        isLifted = false;
+        mascotY = 0;
+        updateMascotDom();
+        playSimLandAnimation();
+      }
+    });
+
+    // Initial setup
+    window.addEventListener('DOMContentLoaded', () => {
+      preloadAll();
+      setTimeout(() => {
+        renderGrid();
+        drawSimImage(idleFrame);
+        updateMascotDom();
+      }, 150);
+    });
+  </script>
+</body>
+</html>

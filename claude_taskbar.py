@@ -160,6 +160,7 @@ class ClaudeTaskbarWidget(QWidget):
         self.window_start_screen_x = None
         self.is_dragging = False
         self.is_lifted = False
+        self.active_drag_variant = "drag_pedal"
         self.on_anim_finished = None
 
         # Fullscreen & Taskbar Embedding state
@@ -766,6 +767,7 @@ class ClaudeTaskbarWidget(QWidget):
                     self.snap_to_taskbar = data.get("snap_to_taskbar", True)
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
                     self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", False)
+                    self.active_drag_variant = data.get("active_drag_variant", "drag_pedal")
                     if "x" in data and "y" in data:
                         self.saved_pos = QPoint(data["x"], data["y"])
             except Exception as e:
@@ -801,7 +803,8 @@ class ClaudeTaskbarWidget(QWidget):
                 "auto_peek_on_shell": self.auto_peek_on_shell,
                 "snap_to_taskbar": self.snap_to_taskbar,
                 "idle_animations_enabled": self.idle_animations_enabled,
-                "auto_hide_fullscreen": self.auto_hide_fullscreen
+                "auto_hide_fullscreen": self.auto_hide_fullscreen,
+                "active_drag_variant": self.active_drag_variant
             }
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -880,8 +883,8 @@ class ClaudeTaskbarWidget(QWidget):
                 if delta.y() <= -LIFT_THRESHOLD:
                     self.is_lifted = True
                     self.is_dragging = True
-                    # Play looping drag animation: flailing little paws and bicycling feet!
-                    self.play_animation("drag", loop=True, speed_ms=85)
+                    # Play looping drag animation with chosen variant (no mouth, minimalist paws)
+                    self.play_animation(getattr(self, "active_drag_variant", "drag_pedal"), loop=True, speed_ms=85)
                 else:
                     # User only moved horizontally or downwards:
                     # Claude resists and stays planted on the floor!
@@ -1032,8 +1035,8 @@ class ClaudeTaskbarWidget(QWidget):
             }
         """)
 
-        # Animations submenu with 23 animations categorized
-        anim_menu = menu.addMenu("🎭 Анимации (23)")
+        # Animations submenu with 28 animations categorized
+        anim_menu = menu.addMenu("🎭 Анимации (28)")
 
         categories = [
             ("✨ Фирменный Claude & AI", [
@@ -1057,8 +1060,15 @@ class ClaudeTaskbarWidget(QWidget):
                 ("❓ Недоумение (Question)", "question", 130, False),
                 ("👀 Оглядеться по сторонам", "look_around", 130, False),
                 ("😉 Моргнуть (Blink)", "blink", 90, False),
-                ("🏃 Поднят в воздух (Drag)", "drag", 85, True),
                 ("🛬 Приземление (Land)", "land", 100, False),
+            ]),
+            ("🏃 Стили поднятия (Drag)", [
+                ("🚴 Велосипедик (Pedal)", "drag_pedal", 85, True),
+                ("⚡ Забавная паника (Flail)", "drag_flail", 80, True),
+                ("🎪 Качели / Маятник (Swing)", "drag_swing", 110, True),
+                ("🐸 Лягушонок (Frog)", "drag_frog", 100, True),
+                ("🐱 За шкирку (Scruff)", "drag_scruff", 115, True),
+                ("🏃 Мультяшный бег (Air Run)", "drag_run", 80, True),
             ]),
             ("🧙 Экшен и магия", [
                 ("🧙 Волшебник (Wizard)", "wizard", 120, False),
@@ -1077,6 +1087,21 @@ class ClaudeTaskbarWidget(QWidget):
             for title, anim_name, speed, loop in items:
                 act = sub.addAction(title)
                 act.triggered.connect(lambda checked=False, a=anim_name, s=speed, l=loop: self.play_animation(a, loop=l, speed_ms=s))
+
+        # Drag style selection menu
+        drag_style_menu = menu.addMenu("🎮 Стиль перетягивания")
+        styles = [
+            ("🚴 Велосипедик (Pedal)", "drag_pedal"),
+            ("⚡ Забавная паника (Flail)", "drag_flail"),
+            ("🎪 Качели / Маятник (Swing)", "drag_swing"),
+            ("🐸 Лягушонок (Frog)", "drag_frog"),
+            ("🐱 За шкирку (Scruff)", "drag_scruff"),
+            ("🏃 Мультяшный бег (Air Run)", "drag_run"),
+        ]
+        for title, key in styles:
+            is_active = (self.active_drag_variant == key)
+            act = drag_style_menu.addAction(f"{'● ' if is_active else '   '}{title}")
+            act.triggered.connect(lambda checked=False, k=key: self.set_drag_variant(k))
 
         menu.addSeparator()
 
@@ -1168,6 +1193,12 @@ class ClaudeTaskbarWidget(QWidget):
             self.unembed_from_taskbar()
 
         self.save_config()
+
+    def set_drag_variant(self, variant_name):
+        self.active_drag_variant = variant_name
+        self.save_config()
+        self.play_animation(variant_name, loop=True, speed_ms=85)
+        QTimer.singleShot(1500, self.play_idle)
 
     def toggle_auto_peek(self):
         self.auto_peek_on_shell = not self.auto_peek_on_shell
