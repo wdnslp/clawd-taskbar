@@ -901,10 +901,45 @@ def make_minimal_body():
             g[y][x] = C
     return g
 
-# 0. Minimalist (Самый минималистичный: руки 2x2 вверх-вниз, ноги +1px / -1px)
+# 0. Minimalist (Самый минималистичный: руки 2x2 вверх-вниз, ножки чередуются через одну)
 def gen_drag_minimal():
-    # Frame 0: Left arm 2x2 UP (rows 5-6), Right arm 2x2 DOWN (rows 7-8)
-    # Left legs 1px shorter (row 10), Right legs 1px longer (rows 10-12)
+    # Frame 0:
+    # Left arm 2x2 UP (rows 5-6), Right arm 2x2 DOWN (rows 7-8)
+    # Ножки чередуются: 1-я (col 4) короткая, 2-я (col 6) длинная, 3-я (col 9) короткая, 4-я (col 11) длинная
+    f0 = make_minimal_body()
+    f0[5][2] = C; f0[5][3] = C
+    f0[6][2] = C; f0[6][3] = C
+    f0[7][12] = C; f0[7][13] = C
+    f0[8][12] = C; f0[8][13] = C
+    for col in (4, 6, 9, 11):
+        f0[10][col] = C
+    f0[11][6] = C; f0[11][11] = C
+    f0[12][6] = C; f0[12][11] = C
+    save_frame(f0, "drag_minimal", 0)
+    save_frame(f0, "drag", 0)
+
+    # Frame 1:
+    # Left arm 2x2 DOWN (rows 7-8), Right arm 2x2 UP (rows 5-6)
+    # Ножки наоборот: 1-я (col 4) длинная, 2-я (col 6) короткая, 3-я (col 9) длинная, 4-я (col 11) короткая
+    f1 = make_minimal_body()
+    f1[7][2] = C; f1[7][3] = C
+    f1[8][2] = C; f1[8][3] = C
+    f1[5][12] = C; f1[5][13] = C
+    f1[6][12] = C; f1[6][13] = C
+    for col in (4, 6, 9, 11):
+        f1[10][col] = C
+    f1[11][4] = C; f1[11][9] = C
+    f1[12][4] = C; f1[12][9] = C
+    save_frame(f1, "drag_minimal", 1)
+    save_frame(f1, "drag", 1)
+
+    save_frame(f0, "drag_minimal", 2)
+    save_frame(f1, "drag_minimal", 3)
+    save_frame(f0, "drag", 2)
+    save_frame(f1, "drag", 3)
+
+# 0-alt. Pair Minimalist (По парам: левые ножки / правые ножки)
+def gen_drag_pairs():
     f0 = make_minimal_body()
     f0[5][2] = C; f0[5][3] = C
     f0[6][2] = C; f0[6][3] = C
@@ -914,11 +949,8 @@ def gen_drag_minimal():
     f0[10][9] = C; f0[10][11] = C
     f0[11][9] = C; f0[11][11] = C
     f0[12][9] = C; f0[12][11] = C
-    save_frame(f0, "drag_minimal", 0)
-    save_frame(f0, "drag", 0)
+    save_frame(f0, "drag_pairs", 0)
 
-    # Frame 1: Left arm 2x2 DOWN (rows 7-8), Right arm 2x2 UP (rows 5-6)
-    # Left legs 1px longer (rows 10-12), Right legs 1px shorter (row 10)
     f1 = make_minimal_body()
     f1[7][2] = C; f1[7][3] = C
     f1[8][2] = C; f1[8][3] = C
@@ -928,13 +960,10 @@ def gen_drag_minimal():
     f1[11][4] = C; f1[11][6] = C
     f1[12][4] = C; f1[12][6] = C
     f1[10][9] = C; f1[10][11] = C
-    save_frame(f1, "drag_minimal", 1)
-    save_frame(f1, "drag", 1)
+    save_frame(f1, "drag_pairs", 1)
 
-    save_frame(f0, "drag_minimal", 2)
-    save_frame(f1, "drag_minimal", 3)
-    save_frame(f0, "drag", 2)
-    save_frame(f1, "drag", 3)
+    save_frame(f0, "drag_pairs", 2)
+    save_frame(f1, "drag_pairs", 3)
 
 # 0b. Sync Minimalist (Синхронный: обе руки 2x2 вверх-вниз, все 4 ноги +1px / -1px)
 def gen_drag_sync():
@@ -1236,6 +1265,7 @@ def main():
 
     # Physics / Interactive Drag & Land (Минималистичные + Стили + Приземление)
     gen_drag_minimal()
+    gen_drag_pairs()
     gen_drag_sync()
     gen_drag_pedal()
     gen_drag_flail()

@@ -1063,7 +1063,8 @@ class ClaudeTaskbarWidget(QWidget):
                 ("🛬 Приземление (Land)", "land", 100, False),
             ]),
             ("🏃 Стили поднятия (Drag)", [
-                ("⭐ Минималистичный (2x2)", "drag_minimal", 90, True),
+                ("⭐ Чередование ножек (Через одну)", "drag_minimal", 90, True),
+                ("👥 По парам (Левые/Правые)", "drag_pairs", 90, True),
                 ("↕️ Синхронный вверх-вниз", "drag_sync", 100, True),
                 ("🚴 Велосипедик (Pedal)", "drag_pedal", 85, True),
                 ("⚡ Забавная паника (Flail)", "drag_flail", 80, True),
@@ -1093,8 +1094,9 @@ class ClaudeTaskbarWidget(QWidget):
         # Drag style selection menu
         drag_style_menu = menu.addMenu("🎮 Стиль перетягивания")
         styles = [
-            ("⭐ Минималистичный (2x2, поочерёдно)", "drag_minimal"),
-            ("↕️ Синхронный (2x2, обе лапки)", "drag_sync"),
+            ("⭐ Чередование ножек (Через одну, 2x2)", "drag_minimal"),
+            ("👥 По парам (Левые/Правые, 2x2)", "drag_pairs"),
+            ("↕️ Синхронный (Все 4 вместе, 2x2)", "drag_sync"),
             ("🚴 Велосипедик (Pedal)", "drag_pedal"),
             ("⚡ Забавная паника (Flail)", "drag_flail"),
             ("🎪 Качели / Маятник (Swing)", "drag_swing"),
