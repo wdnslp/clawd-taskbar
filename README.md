@@ -9,7 +9,6 @@
   <img src="https://img.shields.io/badge/Python-3.10+-141413?style=flat&labelColor=222220&color=d97757" alt="Python" />
   <img src="https://img.shields.io/badge/Framework-PyQt6%20%2B%20Win32-141413?style=flat&labelColor=222220&color=d97757" alt="Framework" />
   <img src="https://img.shields.io/badge/CPU%20Usage-0.0%25%20Idle-141413?style=flat&labelColor=222220&color=4ade80" alt="CPU" />
-  <img src="https://img.shields.io/badge/License-MIT-141413?style=flat&labelColor=222220&color=d97757" alt="License" />
 </p>
 
 An interactive, living pixel-art companion that lives directly on your Windows taskbar. Clawd features contextual awareness for local development and Claude Code workflows, interactive crown-of-head petting with high-contrast blushing cheeks, a customizable wander interval, and over 15 handcrafted animations.
@@ -94,16 +93,28 @@ An interactive, living pixel-art companion that lives directly on your Windows t
 
 ## <img src="assets/icons/download.svg" width="20" height="20" align="center" /> Installation & Quickstart
 
-### Prerequisites
+### ⚡ 5-Second Quick Install (Recommended)
+
+No Python or terminal needed! Simply install and run:
+
+1. Download **[Clawd-Setup-v1.0.0.exe](https://github.com/wdnslp/clawd-taskbar/releases/latest)** (or the Portable `.zip`) from **[Releases](https://github.com/wdnslp/clawd-taskbar/releases)**.
+2. Run the installer — Clawd installs immediately without requiring admin rights.
+3. Clawd will sit happily on your Windows taskbar right away!
+
+---
+
+### 🛠️ Run from Source (Python)
+
+#### Prerequisites
 * **OS:** Windows 10 or Windows 11 (64-bit)
 * **Python:** 3.10 or newer
 
-### Setup
+#### Setup
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/wdnslp/claude-pixel-taskbar.git
-   cd claude-pixel-taskbar
+   git clone https://github.com/wdnslp/clawd-taskbar.git
+   cd clawd-taskbar
    ```
 
 2. **Install required dependencies:**
@@ -133,7 +144,7 @@ An interactive, living pixel-art companion that lives directly on your Windows t
 ## <img src="assets/icons/folder.svg" width="20" height="20" align="center" /> Repository Structure
 
 ```text
-claude-pixel-taskbar/
+clawd-taskbar/
 ├── animations/                 # Pixel-art sprite sequences (PNG)
 ├── assets/                     # Banners, demonstration media, and iconography
 │   ├── banner_animated.gif     # Main animated showcase banner
@@ -151,7 +162,6 @@ claude-pixel-taskbar/
 ├── claude_taskbar.py           # Backward-compatible entrypoint
 ├── run.bat                     # Background launcher script
 ├── README.md                   # Project documentation
-├── LICENSE                     # MIT License
 └── .gitignore                  # Git ignore rules
 ```
 
@@ -184,9 +194,3 @@ Application settings are automatically stored in `config.json` upon exit:
 * **Iconography:** Official [Google Fonts Icons / Material Symbols](https://fonts.google.com/icons).
 * **Visual Aesthetic:** Minimalist editorial design inspired by Anthropic's signature palette (`#141413`, terracotta accents, and classic typography).
 * **Character Design:** Pixel-art mascot crafted for developers working with Claude Code and AI tooling.
-
----
-
-## <img src="assets/icons/shield.svg" width="20" height="20" align="center" /> License
-
-This project is licensed under the [MIT License](LICENSE). Free for personal and commercial use, modification, and distribution.

@@ -11,6 +11,17 @@ env/
 venv/
 .venv/
 
+# Build & Installer artifacts
+build/
+dist/
+*.spec
+*.iss
+Output/
+installer/
+release/
+*.exe
+*.zip
+
 # Temporary & OS
 scratch/
 *.mp4

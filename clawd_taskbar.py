@@ -25,8 +25,15 @@ try:
 except Exception:
     pass
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+if getattr(sys, "frozen", False):
+    BUNDLE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    EXE_DIR = os.path.dirname(sys.executable)
+else:
+    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
+    EXE_DIR = BUNDLE_DIR
+
+BASE_DIR = BUNDLE_DIR
+CONFIG_FILE = os.path.join(EXE_DIR, "config.json")
 ANIM_DIR = os.path.join(BASE_DIR, "animations")
 BASE_IMAGE_PATH = os.path.join(BASE_DIR, "base.png")
 ARM_IMAGE_PATH = os.path.join(BASE_DIR, "right-arm-up.png")
@@ -168,13 +175,16 @@ def set_autostart_configured(enabled: bool) -> bool:
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_REG_KEY, 0, winreg.KEY_SET_VALUE | winreg.KEY_QUERY_VALUE)
         if enabled:
-            py_exe = sys.executable
-            pyw_exe = os.path.join(os.path.dirname(py_exe), "pythonw.exe")
-            runner = pyw_exe if os.path.exists(pyw_exe) else py_exe
-            script_path = os.path.abspath(os.path.join(BASE_DIR, "clawd_taskbar.py"))
-            if not os.path.exists(script_path):
-                script_path = os.path.abspath(os.path.join(BASE_DIR, "claude_taskbar.py"))
-            cmd = f'"{runner}" "{script_path}"'
+            if getattr(sys, "frozen", False):
+                cmd = f'"{sys.executable}"'
+            else:
+                py_exe = sys.executable
+                pyw_exe = os.path.join(os.path.dirname(py_exe), "pythonw.exe")
+                runner = pyw_exe if os.path.exists(pyw_exe) else py_exe
+                script_path = os.path.abspath(os.path.join(EXE_DIR, "clawd_taskbar.py"))
+                if not os.path.exists(script_path):
+                    script_path = os.path.abspath(os.path.join(EXE_DIR, "claude_taskbar.py"))
+                cmd = f'"{runner}" "{script_path}"'
             winreg.SetValueEx(key, APP_REG_NAME, 0, winreg.REG_SZ, cmd)
         else:
             for k in (APP_REG_NAME, "ClaudeTaskbar"):
