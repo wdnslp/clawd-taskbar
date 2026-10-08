@@ -313,8 +313,6 @@ class RoamZoneOverlayWidget(QWidget):
 
         # Load Google Material Symbols Outlined 'close' icon
         close_svg = os.path.join(ICONS_DIR, "close.svg")
-        if not os.path.exists(close_svg):
-            close_svg = os.path.join(BASE_DIR, "assets", "close.svg")
         if os.path.exists(close_svg):
             self.close_renderer = QSvgRenderer(close_svg)
         else:

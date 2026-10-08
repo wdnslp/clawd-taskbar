@@ -149,8 +149,6 @@ claude-pixel-taskbar/
 ├── right-arm-up.png            # Raised arm sprite
 ├── clawd_taskbar.py            # Main application (PyQt6 + Win32 API)
 ├── claude_taskbar.py           # Backward-compatible entrypoint
-├── generate_banners.py         # Minimalist Anthropic-style banner generator
-├── generate_extra_visuals.py   # Extra visual banners and infographic cards
 ├── run.bat                     # Background launcher script
 ├── README.md                   # Project documentation
 ├── LICENSE                     # MIT License
