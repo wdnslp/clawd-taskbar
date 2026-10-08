@@ -11,10 +11,9 @@ env/
 venv/
 .venv/
 
-# Preview / temp
-taskbar_preview.png
-*.mp4
+# Temporary & OS
 scratch/
-/*.png
-!assets/
-!assets/icons/*.png
+*.mp4
+*.log
+.DS_Store
+Thumbs.db

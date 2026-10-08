@@ -1,56 +1,194 @@
-# 🤖 Claude на панели задач (Taskbar Mascot)
+<p align="center">
+  <img src="assets/banner_animated.gif" alt="Clawd — Pixel Taskbar Mascot" width="100%" />
+</p>
 
-Интерактивный пиксельный персонаж Клода, который живёт прямо на вашей панели задач Windows с богатым набором анимаций, реакций и живым поведением.
+# Clawd — Pixel Taskbar Mascot
 
-## 🚀 Как запустить
+<p align="left">
+  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-141413?style=flat&labelColor=222220&color=d97757" alt="Platform" />
+  <img src="https://img.shields.io/badge/Python-3.10+-141413?style=flat&labelColor=222220&color=d97757" alt="Python" />
+  <img src="https://img.shields.io/badge/Framework-PyQt6%20%2B%20Win32-141413?style=flat&labelColor=222220&color=d97757" alt="Framework" />
+  <img src="https://img.shields.io/badge/CPU%20Usage-0.0%25%20Idle-141413?style=flat&labelColor=222220&color=4ade80" alt="CPU" />
+  <img src="https://img.shields.io/badge/License-MIT-141413?style=flat&labelColor=222220&color=d97757" alt="License" />
+</p>
 
-- **Быстрый запуск:** Дважды кликните по [`run.bat`](file:///u:/claudePixeltaskbar/run.bat) (запускается в фоновом режиме через `pythonw`, без лишних чёрных окон консоли).
-- **Или через терминал:** `python claude_taskbar.py`
-- **Генератор анимаций:** `python generate_animations.py` (генерирует все 94 пиксельных кадра в папку `animations/`).
+An interactive, living pixel-art companion that lives directly on your Windows taskbar. Clawd features contextual awareness for local development and Claude Code workflows, interactive crown-of-head petting with high-contrast blushing cheeks, a customizable wander interval, and over 15 handcrafted animations.
 
----
-
-## 🎭 16 Пиксельных Анимаций
-
-Все анимации выполнены в аутентичном пиксель-арт стиле Клода (палитра `#DA7758`, глаза, спецэффекты):
-
-1. **👋 Помахать рукой (Wave)** — машет правой рукой туда-сюда.
-2. **🎉 Радость (Cheer)** — поднимает обе руки вверх и радостно подпрыгивает.
-3. **🦘 Прыжок (Jump)** — приседает, взлетает высоко в воздух и пружинит при приземлении.
-4. **💃 Весёлый танец (Dance)** — качается из стороны в сторону, перебирает лапками и танцует.
-5. **💖 Любовь и сердечко (Heart)** — краснеет щечками, над головой появляется и бьётся пиксельное сердечко со звёздочками.
-6. **☕ Чашка кофе (Coffee)** — держит кружку с горячим паром, делает глоток и довольно жмурится.
-7. **💡 Осенила идея (Idea)** — смотрит вверх, над головой загорается желтая лампочка со световыми лучами.
-8. **💻 Кодинг за ноутбуком (Typing)** — открывает миниатюрный пиксельный ноутбук со светящимся экраном и усердно стучит по клавиатуре.
-9. **🕶️ Крутой в очках (Cool)** — сверху падают тёмные очки с белым бликом, надеваются на глаза и сверкают.
-10. **🔄 Вращение 360° (Spin)** — поворачивается боком, спиной, вторым боком и лицом.
-11. **🙈 Спрятаться за панель (Peek)** — ныряет вниз за нижний край экрана, осторожно выглядывает глазами по сторонам и выпрыгивает обратно.
-12. **🥱 Зевнуть (Yawn)** — широко зевает, сладко потягивается лапками и прищуривается.
-13. **❓ Недоумение (Question)** — наклоняет голову, над головой пульсирует желтый знак вопроса.
-14. **👀 Оглядеться по сторонам (Look around)** — переводит взгляд влево и вправо.
-15. **😉 Моргнуть (Blink)** — естественное моргание глазками.
-16. **💤 Заснуть (Sleep)** — закрывает глаза, опускает голову, вверх улетают сонные буквы Zzz.
+<p align="center">
+  <img src="assets/taskbar_screenshot.png" alt="Clawd natively embedded on the Windows 11 taskbar" width="100%" />
+</p>
+<p align="center">
+  <em>Clawd living natively on the Windows taskbar next to the notification area and running applications.</em>
+</p>
 
 ---
 
-## 🎮 Управление и взаимодействие
+## <img src="assets/icons/auto_awesome.svg" width="20" height="20" align="center" /> Key Features
 
-1. **👆 Одиночный клик ЛКМ:**
-   - Клод случайным образом радостно реагирует (машет рукой, шлёт сердечко, прыгает, надевает крутые очки, танцует или подмигивает).
-2. **✌️ Двойной клик ЛКМ:**
-   - Особая активная анимация (высокий прыжок / победный жест / вращение).
-3. **✨ Живой режим (Авто-анимации):**
-   - Если его не трогать, он сам периодически живёт своей жизнью (моргает, оглядывается, пьёт кофе, зевает, кодит или прячется за край экрана).
-   - Включается и выключается в контекстном меню (ПКМ).
-4. **🖐️ Перетаскивание (Drag & Drop):**
-   - Зажмите ЛКМ и перемещайте по экрану.
-   - **Ограничение границ экрана:** Клод физически не может вылезти за пределы монитора слева и справа.
-   - Автоматическое сохранение позиции в `config.json`.
-5. **🔍 Изменение размера:**
-   - **Колёсико мыши:** крутите прямо над персонажем для изменения масштаба (ножки всегда остаются привязаны к низу экрана).
-   - **ПКМ → Меню «Размер»:** 24px (половина панели), 32px, 40px, 48px (на всю высоту), 64px.
-6. **⚙️ Контекстное меню (ПКМ):**
-   - Выбор любой из 16 анимаций напрямую.
-   - Переключатель «Живой режим».
-   - Сброс на позицию по умолчанию.
-   - Выход.
+### <img src="assets/icons/terminal.svg" width="18" height="18" align="center" /> Smart Context & Process Awareness
+* **Background Sentinel:** Continuously scans for active Claude Code processes (`claude`, `claude-code`) and coding environments.
+* **Contextual Work Reaction:** Whenever code generation or tool executions occur, Clawd takes out his laptop and types alongside you in real time.
+* **Task Celebration:** When the task completes, Clawd raises his arms in celebration, puts away the laptop, and returns to idle.
+
+### <img src="assets/icons/pets.svg" width="18" height="18" align="center" /> Crown Petting & High-Contrast Blush
+* **Head Stroking:** Move the cursor gently across the crown of Clawd's head (the area directly above his forehead).
+* **Vibrant Blush Bloom:** High-contrast hot pink cheeks bloom across his face, accompanied by floating heart particles.
+* **Instant Action Cancellation:** Cheeks instantly disappear the exact millisecond any animation begins, a click occurs, or an event triggers.
+
+<p align="center">
+  <img src="assets/petting_demo.gif" alt="Interactive Petting Demonstration" width="640px" />
+</p>
+
+### <img src="assets/icons/walk.svg" width="18" height="18" align="center" /> Draggable Wander Zone
+* **Dedicated Taskbar Interval:** Configure a custom taskbar interval to ensure Clawd never steps on pinned apps or notification icons.
+* **Ambient Roaming:** When wander mode is enabled, Clawd periodically takes calm steps left and right strictly within his boundary.
+* **Interactive Adjustment:** Visual brackets let you resize or relocate the safe zone directly on the taskbar.
+
+<p align="center">
+  <img src="assets/wander_demo.gif" alt="Draggable Wander Zone Demonstration" width="100%" />
+</p>
+
+### <img src="assets/icons/auto_awesome.svg" width="18" height="18" align="center" /> Living Expressions & Handcrafted Animations
+* Over 15 unique 16x16 pixel-art animation states rendered crisply at high resolution.
+* Includes warm coffee breaks with rising steam, wizard hat conjuring with glowing crystals, dances, paw waves, and stretches.
+
+<p align="center">
+  <img src="assets/animations_showcase.gif" alt="Living Expressions & Handcrafted Animations" width="100%" />
+</p>
+
+### <img src="assets/icons/bedtime.svg" width="18" height="18" align="center" /> AFK Auto-Sleep Mode
+* **Inactivity Detection:** After 5 minutes without mouse or keyboard input, Clawd gently curls up and falls asleep.
+* **Wake Reaction:** The moment you touch the mouse or type, Clawd wakes up cheerfully to greet you.
+
+### <img src="assets/icons/tune.svg" width="18" height="18" align="center" /> System Tray Integration & Native Win32 Engine
+* **Native Taskbar Embedding:** Direct Win32 `Shell_TrayWnd` coordination ensures Clawd stays pinned to the taskbar without clipping beneath fullscreen apps.
+* **Minimalist Tray Menu:** Context menu powered by Google Material Symbols icons.
+* **Autostart Support:** Toggle automatic launch at Windows login via the Windows registry.
+* **Multi-Language:** Automatic system language detection with manual toggle (English, Ukrainian, Russian).
+* **Zero Resource Impact:** Pure event-driven rendering with 0.0% CPU overhead while idle.
+
+---
+
+## <img src="assets/icons/sports_esports.svg" width="20" height="20" align="center" /> Controls & Mouse Interactions
+
+<p align="center">
+  <img src="assets/controls_guide.png" alt="Mouse Controls Guide" width="100%" />
+</p>
+
+| Interaction | Gesture | Description |
+| :--- | :--- | :--- |
+| **Pet Crown** | Hover cursor strictly above head | High-contrast pink cheeks bloom; instantly clears on click or action. |
+| **Playful Reaction** | Left Click | Triggers a random playful animation (wave, cheer, jump, heart, magic). |
+| **Reposition** | Click & Drag Upward | Pull slightly upward to detach from the taskbar floor, then drag horizontally. |
+| **Context Menu** | Right Click (Clawd or Tray) | Configure Wander Zone, Autostart, Language, Snap to Taskbar, or Quit. |
+
+---
+
+## <img src="assets/icons/layers.svg" width="20" height="20" align="center" /> Architecture & Performance
+
+<p align="center">
+  <img src="assets/architecture.png" alt="Architecture & Runtime Overview" width="100%" />
+</p>
+
+---
+
+## <img src="assets/icons/download.svg" width="20" height="20" align="center" /> Installation & Quickstart
+
+### Prerequisites
+* **OS:** Windows 10 or Windows 11 (64-bit)
+* **Python:** 3.10 or newer
+
+### Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/wdnslp/claude-pixel-taskbar.git
+   cd claude-pixel-taskbar
+   ```
+
+2. **Install required dependencies:**
+   ```bash
+   pip install PyQt6 psutil pillow
+   ```
+
+3. **Launch Clawd:**
+   * **Console mode (with logs):**
+     ```bash
+     python clawd_taskbar.py
+     ```
+   * **Silent background mode (no console):**
+     Double-click `run.bat` or run:
+     ```bash
+     pythonw clawd_taskbar.py
+     ```
+
+---
+
+<p align="center">
+  <img src="assets/banner.png" alt="Clawd Overview Banner" width="100%" />
+</p>
+
+---
+
+## <img src="assets/icons/folder.svg" width="20" height="20" align="center" /> Repository Structure
+
+```text
+claude-pixel-taskbar/
+├── animations/                 # Pixel-art sprite sequences (PNG)
+├── assets/                     # Banners, demonstration media, and iconography
+│   ├── banner_animated.gif     # Main animated showcase banner
+│   ├── banner.png              # Static feature overview banner
+│   ├── petting_demo.gif        # Crown petting & blush demo
+│   ├── wander_demo.gif         # Draggable wander zone demo
+│   ├── animations_showcase.gif # Living expressions showcase
+│   ├── controls_guide.png      # Mouse interaction guide card
+│   ├── architecture.png        # Architecture & runtime overview card
+│   ├── taskbar_screenshot.png  # Authentic Windows 11 taskbar capture
+│   └── icons/                  # Google Material Symbols (SVG / PNG)
+├── base.png                    # Base idle sprite (16x16)
+├── right-arm-up.png            # Raised arm sprite
+├── clawd_taskbar.py            # Main application (PyQt6 + Win32 API)
+├── claude_taskbar.py           # Backward-compatible entrypoint
+├── generate_banners.py         # Minimalist Anthropic-style banner generator
+├── generate_extra_visuals.py   # Extra visual banners and infographic cards
+├── run.bat                     # Background launcher script
+├── README.md                   # Project documentation
+├── LICENSE                     # MIT License
+└── .gitignore                  # Git ignore rules
+```
+
+---
+
+## <img src="assets/icons/verified.svg" width="20" height="20" align="center" /> Configuration
+
+Application settings are automatically stored in `config.json` upon exit:
+
+```json
+{
+  "x": 1420,
+  "y": 1040,
+  "wander_mode": false,
+  "wander_min_x": 1200,
+  "wander_max_x": 1600,
+  "language": "en"
+}
+```
+
+* **`x`, `y`**: Saved taskbar coordinates.
+* **`wander_mode`**: Toggle for autonomous roaming.
+* **`wander_min_x`, `wander_max_x`**: Boundary intervals for the safe wander zone.
+* **`language`**: UI language selection (`en`, `uk`, `ru`).
+
+---
+
+## <img src="assets/icons/description.svg" width="20" height="20" align="center" /> Credits & Design
+
+* **Iconography:** Official [Google Fonts Icons / Material Symbols](https://fonts.google.com/icons).
+* **Visual Aesthetic:** Minimalist editorial design inspired by Anthropic's signature palette (`#141413`, terracotta accents, and classic typography).
+* **Character Design:** Pixel-art mascot crafted for developers working with Claude Code and AI tooling.
+
+---
+
+## <img src="assets/icons/shield.svg" width="20" height="20" align="center" /> License
+
+This project is licensed under the [MIT License](LICENSE). Free for personal and commercial use, modification, and distribution.
