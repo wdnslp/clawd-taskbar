@@ -212,9 +212,10 @@
       letter-spacing: 0.05em;
     }
 
-    .badge-emotion { background: rgba(235, 90, 130, 0.15); color: #ff7597; border: 1px solid rgba(235, 90, 130, 0.35); }
+    .badge-claude  { background: rgba(218, 119, 88, 0.15); color: #f28b6d; border: 1px solid rgba(218, 119, 88, 0.35); }
     .badge-tech    { background: rgba(80, 220, 240, 0.15); color: #50dcf0; border: 1px solid rgba(80, 220, 240, 0.35); }
-    .badge-meme    { background: rgba(245, 140, 40, 0.15); color: #ffa245; border: 1px solid rgba(245, 140, 40, 0.35); }
+    .badge-emotion { background: rgba(235, 90, 130, 0.15); color: #ff7597; border: 1px solid rgba(235, 90, 130, 0.35); }
+    .badge-cozy    { background: rgba(245, 140, 40, 0.15); color: #ffa245; border: 1px solid rgba(245, 140, 40, 0.35); }
     .badge-magic   { background: rgba(165, 80, 230, 0.15); color: #b77bf7; border: 1px solid rgba(165, 80, 230, 0.35); }
     .badge-mode    { background: rgba(90, 170, 240, 0.15); color: #6bb6ff; border: 1px solid rgba(90, 170, 240, 0.35); }
 
@@ -556,7 +557,7 @@
         </div>
         <div class="brand-text">
           <h1>Claude Pixel Taskbar Mascot</h1>
-          <p>Интерактивная галерея и демонстрация всех 32 уникальных анимаций</p>
+          <p>Интерактивная галерея и демонстрация всех 30 уникальных анимаций</p>
         </div>
       </div>
       <div class="header-actions">
@@ -572,18 +573,18 @@
         <!-- Info Column -->
         <div class="stage-info">
           <div class="badge-row">
-            <span id="stageBadge" class="cat-badge badge-emotion">Эмоции</span>
-            <span id="stageCounter" class="anim-counter">#01 / 32</span>
+            <span id="stageBadge" class="cat-badge badge-claude">Фирменный Claude</span>
+            <span id="stageCounter" class="anim-counter">#01 / 30</span>
           </div>
 
-          <h2 id="stageTitle" class="stage-title">👋 Помахать рукой (Wave)</h2>
-          <div id="stageId" class="stage-id">claude.play_animation("wave")</div>
-          <p id="stageDesc" class="stage-desc">Дружелюбный привет пользователю правой рукой</p>
+          <h2 id="stageTitle" class="stage-title">✨ Искра Claude (AI Spark)</h2>
+          <div id="stageId" class="stage-id">claude.play_animation("spark")</div>
+          <p id="stageDesc" class="stage-desc">В глазах зажигается золото, рождается сияющая звезда Claude</p>
 
           <div class="stage-specs">
             <div class="spec-item">
               <span class="spec-label">Кадров</span>
-              <span id="specFrames" class="spec-val">7 кадров</span>
+              <span id="specFrames" class="spec-val">8 кадров</span>
             </div>
             <div class="spec-item">
               <span class="spec-label">Скорость</span>
@@ -630,13 +631,14 @@
 
     <!-- GALLERY SECTION -->
     <div class="gallery-header">
-      <h2 class="gallery-title">Каталог всех 32 анимаций</h2>
+      <h2 class="gallery-title">Каталог всех 30 анимаций</h2>
       <div class="filter-tabs">
-        <button class="filter-btn active" onclick="setFilter('all', this)">Все (32)</button>
-        <button class="filter-btn" onclick="setFilter('emotion', this)">😊 Эмоции (13)</button>
+        <button class="filter-btn active" onclick="setFilter('all', this)">Все (30)</button>
+        <button class="filter-btn" onclick="setFilter('claude', this)">🤖 Фирменный Claude (6)</button>
         <button class="filter-btn" onclick="setFilter('tech', this)">💻 Работа & Код (5)</button>
-        <button class="filter-btn" onclick="setFilter('meme', this)">🔥 Мемы & Юмор (7)</button>
-        <button class="filter-btn" onclick="setFilter('magic', this)">✨ Магия & Экшен (6)</button>
+        <button class="filter-btn" onclick="setFilter('emotion', this)">😊 Эмоции & Жесты (9)</button>
+        <button class="filter-btn" onclick="setFilter('cozy', this)">🌸 Уют & Творчество (4)</button>
+        <button class="filter-btn" onclick="setFilter('magic', this)">✨ Магия & Экшен (5)</button>
         <button class="filter-btn" onclick="setFilter('mode', this)">💤 Режимы (1)</button>
       </div>
     </div>
@@ -645,53 +647,53 @@
     <div id="cardsGrid" class="grid"></div>
 
     <footer class="footer">
-      <p>Claude Pixel Taskbar Mascot • 32 Анимации • 195 Кадров • Разработано для Windows 11</p>
+      <p>Claude Pixel Taskbar Mascot • 30 Анимаций • 193 Кадра • Разработано для Windows 11</p>
       <p style="margin-top: 6px;">Запускайте анимации прямо в трее Windows через правый клик мыши!</p>
     </footer>
   </div>
 
   <script>
     const ANIMATIONS = [
-      // 1. Classic & Emotions
-      { name: "wave", title: "👋 Помахать рукой (Wave)", cat: "emotion", catTitle: "Эмоции", desc: "Дружелюбный привет пользователю правой рукой", speed: 110, frames: 7 },
-      { name: "cheer", title: "🎉 Радость (Cheer)", cat: "emotion", catTitle: "Эмоции", desc: "Победный восторг с обеими поднятыми руками", speed: 120, frames: 7 },
-      { name: "jump", title: "🦘 Прыжок (Jump)", cat: "emotion", catTitle: "Эмоции", desc: "Пружинистый прыжок с деформацией тела", speed: 100, frames: 7 },
-      { name: "dance", title: "💃 Весёлый танец (Dance)", cat: "emotion", catTitle: "Эмоции", desc: "Ритмичный шаг влево и вправо в такт музыке", speed: 120, frames: 4 },
-      { name: "heart", title: "💖 Любовь и сердечко (Heart)", cat: "emotion", catTitle: "Эмоции", desc: "Смущенный румянец и бьющееся сердце", speed: 130, frames: 6 },
-      { name: "cool", title: "🕶️ Крутой в очках (Cool)", cat: "emotion", catTitle: "Эмоции", desc: "Черные очки падают с блеском", speed: 130, frames: 6 },
-      { name: "applause", title: "👏 Аплодисменты (Applause)", cat: "emotion", catTitle: "Эмоции", desc: "Бурные овации в ладоши и палец вверх автору", speed: 110, frames: 7 },
-      { name: "dab", title: "🤙 Победный дэб (Dab)", cat: "emotion", catTitle: "Эмоции", desc: "Стильный победный дэб с наклоном головы в локоть", speed: 110, frames: 6 },
-      { name: "cry", title: "😭 Аниме-плач (Cry)", cat: "emotion", catTitle: "Эмоции", desc: "Драматичные фонтаны слез в обе стороны", speed: 110, frames: 6 },
-      { name: "yawn", title: "🥱 Зевнуть и потянуться (Yawn)", cat: "emotion", catTitle: "Эмоции", desc: "Усталый зевок с открытым ртом", speed: 140, frames: 5 },
-      { name: "question", title: "❓ Недоумение (Question)", cat: "emotion", catTitle: "Эмоции", desc: "Наклон головы и вопросительный знак над головой", speed: 130, frames: 5 },
-      { name: "look_around", title: "👀 Оглядеться по сторонам", cat: "emotion", catTitle: "Эмоции", desc: "Любопытный взгляд влево, вправо и вперед", speed: 130, frames: 7 },
-      { name: "blink", title: "😉 Моргнуть (Blink)", cat: "emotion", catTitle: "Эмоции", desc: "Естественное моргание в фоновом режиме", speed: 90, frames: 4 },
+      // 1. AI & Core Identity (Claude)
+      { name: "spark", title: "✨ Искра Claude (AI Spark)", cat: "claude", catTitle: "Фирменный Claude", desc: "В глазах зажигается золото, рождается сияющая звезда Claude", speed: 110, frames: 8 },
+      { name: "chat", title: "💭 Ответ Claude (Chat ...)", cat: "claude", catTitle: "Фирменный Claude", desc: "Облако мыслей с бегающими точками и вспышка готового ответа", speed: 120, frames: 6 },
+      { name: "shield", title: "🛡️ Защитный купол (Shield)", cat: "claude", catTitle: "Фирменный Claude", desc: "Энергетический шестиугольный барьер безопасности и защиты", speed: 120, frames: 7 },
+      { name: "battery", title: "⚡ Подзарядка 100% (Battery)", cat: "claude", catTitle: "Фирменный Claude", desc: "Молния заряжает батарею до максимума мощности", speed: 110, frames: 6 },
+      { name: "scan", title: "📡 Кибер-сканер (Scan)", cat: "claude", catTitle: "Фирменный Claude", desc: "Лазерное сканирование данных и голографический пинг", speed: 120, frames: 6 },
+      { name: "matrix", title: "🟢 Матрица / Хакер (Matrix)", cat: "claude", catTitle: "Фирменный Claude", desc: "Зеленый цифровой поток кода и светящийся кибер-визор", speed: 120, frames: 6 },
 
       // 2. Tech & Code
-      { name: "typing", title: "💻 Кодить за ноутбуком (Typing)", cat: "tech", catTitle: "Работа и код", desc: "Быстрый набор кода на светящемся кибер-ноуте", speed: 110, frames: 6 },
-      { name: "matrix", title: "🟢 Матрица / Хакер (Matrix)", cat: "tech", catTitle: "Работа и код", desc: "Зеленый цифровой дождь кода и неоновый визор", speed: 120, frames: 6 },
+      { name: "typing", title: "💻 Кодить за ноутбуком (Typing)", cat: "tech", catTitle: "Работа и код", desc: "Длинная сессия кодинга, хакерский рывок и успешный билд", speed: 110, frames: 12 },
+      { name: "bug", title: "🐛 Поимка бага (Bug -> ✔)", cat: "tech", catTitle: "Работа и код", desc: "Ловит красный баг и превращает его в зеленую галочку успеха", speed: 110, frames: 7 },
       { name: "idea", title: "💡 Осенила идея (Idea)", cat: "tech", catTitle: "Работа и код", desc: "Яркая вспышка лампочки с лучами вдохновения", speed: 120, frames: 6 },
-      { name: "read", title: "📖 Читать документацию (Read)", cat: "tech", catTitle: "Работа и код", desc: "Изучает мануал и аккуратно листает страницу", speed: 130, frames: 6 },
       { name: "coffee", title: "☕ Выпить чашку кофе (Coffee)", cat: "tech", catTitle: "Работа и код", desc: "Горячая кружка кофе с ароматным паром", speed: 140, frames: 5 },
+      { name: "tea", title: "🍵 Уютный чай (Tea)", cat: "tech", catTitle: "Работа и код", desc: "Неспешное теплое чаепитие с белым паром", speed: 130, frames: 6 },
 
-      // 3. Memes & Fun
-      { name: "pizza", title: "🍕 Кушать пиццу (Pizza)", cat: "meme", catTitle: "Мемы и юмор", desc: "Аппетитный горячий ломтик с тянущимся сыром", speed: 120, frames: 6 },
-      { name: "rage", title: "💥 Рейдж / Переворот стола (Rage)", cat: "meme", catTitle: "Мемы и юмор", desc: "Классический (╯°□°)╯︵ ┻━┻ после бага в коде", speed: 100, frames: 7 },
-      { name: "rock", title: "🎸 Рок-концерт (Rock)", cat: "meme", catTitle: "Мемы и юмор", desc: "Забойное соло на электрогитаре с хедбэнгингом", speed: 100, frames: 6 },
-      { name: "fire", title: "☕🔥 This is Fine (В огне)", cat: "meme", catTitle: "Мемы и юмор", desc: "Вокруг бушует пламя, а Клод спокоен с чашкой", speed: 130, frames: 6 },
-      { name: "cat", title: "🐱 Котик на голове (Cat)", cat: "meme", catTitle: "Мемы и юмор", desc: "Мурчащий рыжий котенок с виляющим хвостиком", speed: 130, frames: 6 },
-      { name: "money", title: "💰 Денежный дождь (Money)", cat: "meme", catTitle: "Мемы и юмор", desc: "Дождь из золотых монет и хрустящих банкнот", speed: 120, frames: 6 },
-      { name: "disco", title: "🪩 Диско-вечеринка (Disco)", cat: "meme", catTitle: "Мемы и юмор", desc: "Позы Траволты под сверкающим диско-шаром", speed: 120, frames: 6 },
+      // 3. Emotions & Gestures
+      { name: "wave", title: "👋 Помахать рукой (Wave)", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Дружелюбный привет пользователю аккуратной короткой лапкой", speed: 110, frames: 7 },
+      { name: "cheer", title: "🎉 Радость (Cheer)", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Победный восторг с поднятыми вверх короткими лапками", speed: 120, frames: 7 },
+      { name: "jump", title: "🦘 Прыжок (Jump)", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Пружинистый прыжок с плавной деформацией тела", speed: 100, frames: 7 },
+      { name: "dance", title: "💃 Весёлый танец (Dance)", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Аккуратный ритмичный шаг влево и вправо без растягивания лапок", speed: 120, frames: 4 },
+      { name: "heart", title: "💖 Любовь и сердечко (Heart)", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Смущенный румянец на щечках и бьющееся сердце", speed: 130, frames: 6 },
+      { name: "cry", title: "😭 Аниме-плач (Cry)", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Драматичные фонтаны слез в обе стороны", speed: 110, frames: 6 },
+      { name: "question", title: "❓ Недоумение (Question)", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Наклон головы и вопросительный знак над головой", speed: 130, frames: 5 },
+      { name: "look_around", title: "👀 Оглядеться по сторонам", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Любопытный взгляд влево, вправо и по центру", speed: 130, frames: 7 },
+      { name: "blink", title: "😉 Моргание (Blink)", cat: "emotion", catTitle: "Эмоции и жесты", desc: "Естественное моргание глазками в фоновом режиме", speed: 90, frames: 4 },
 
-      // 4. Action & Magic
+      // 4. Cozy & Craft
+      { name: "zen", title: "🧘 Дзен / Медитация (Zen)", cat: "cozy", catTitle: "Уют и творчество", desc: "Поза лотоса, мягкое парение в воздухе и гармония", speed: 150, frames: 7 },
+      { name: "origami", title: "⛵ Кораблик оригами (Origami)", cat: "cozy", catTitle: "Уют и творчество", desc: "Складывает белый бумажный кораблик в лапках", speed: 130, frames: 6 },
+      { name: "stars", title: "🌠 Звездопад / Созвездие (Stars)", cat: "cozy", catTitle: "Уют и творчество", desc: "Падающая звезда, созвездие и загаданное желание", speed: 130, frames: 7 },
+      { name: "pizza", title: "🍕 Кушать пиццу (Pizza)", cat: "cozy", catTitle: "Уют и творчество", desc: "Аппетитный горячий ломтик с тянущимся сыром", speed: 120, frames: 6 },
+
+      // 5. Magic & Action
       { name: "wizard", title: "🧙 Волшебник (Wizard)", cat: "magic", catTitle: "Магия и экшен", desc: "Шляпа мага, взмах палочки и сноп волшебных звезд", speed: 120, frames: 6 },
-      { name: "superhero", title: "🦸 Супермен / Полёт (Superhero)", cat: "magic", catTitle: "Магия и экшен", desc: "Развевающийся красный плащ и взлет в небо", speed: 100, frames: 7 },
+      { name: "workout", title: "🏋️ Качалка / Штанга (Workout)", cat: "magic", catTitle: "Магия и экшен", desc: "Рывок тяжелой штанги над головой и победный флекс", speed: 120, frames: 7 },
       { name: "ghost", title: "👻 Привидение / Бу! (Ghost)", cat: "magic", catTitle: "Магия и экшен", desc: "Превращение в милое привидение с криком Бу!", speed: 110, frames: 7 },
-      { name: "workout", title: "🏋️ Качалка / Штанга (Workout)", cat: "magic", catTitle: "Магия и экшен", desc: "Рывок тяжелой штанги над головой и флекс мышц", speed: 120, frames: 7 },
       { name: "spin", title: "🔄 Крутиться на 360° (Spin)", cat: "magic", catTitle: "Магия и экшен", desc: "Стремительный полный оборот вокруг своей оси", speed: 90, frames: 7 },
-      { name: "peek", title: "🙈 Прятаться за панель (Peek)", cat: "magic", catTitle: "Магия и экшен", desc: "Опускается за край панели и высматривает", speed: 120, frames: 7 },
+      { name: "peek", title: "🙈 Прятаться за панель (Peek)", cat: "magic", catTitle: "Магия и экшен", desc: "Опускается за край панели и выглядывает", speed: 120, frames: 7 },
 
-      // 5. Modes
+      // 6. Modes
       { name: "sleep", title: "💤 Заснуть (Sleep Zzz)", cat: "mode", catTitle: "Режимы", desc: "Глубокий уютный сон с улетающими буквами Zzz", speed: 200, frames: 5 },
     ];
 

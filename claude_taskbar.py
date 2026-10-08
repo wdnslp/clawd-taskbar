@@ -593,18 +593,22 @@ class ClaudeTaskbarWidget(QWidget):
         choices = [
             ("blink", 30),
             ("look_around", 15),
+            ("tea", 8),
             ("coffee", 8),
+            ("spark", 8),
+            ("chat", 7),
             ("idea", 6),
-            ("yawn", 6),
-            ("typing", 5),
-            ("cat", 5),
-            ("read", 5),
+            ("typing", 6),
+            ("origami", 5),
+            ("stars", 5),
+            ("zen", 5),
+            ("bug", 5),
             ("pizza", 4),
             ("peek", 4),
-            ("matrix", 3),
-            ("money", 3),
-            ("fire", 3),
-            ("wizard", 3),
+            ("matrix", 4),
+            ("scan", 4),
+            ("shield", 3),
+            ("battery", 3),
         ]
         total = sum(w for _, w in choices)
         r = random.randint(1, total)
@@ -623,8 +627,8 @@ class ClaudeTaskbarWidget(QWidget):
             speed = 110
         elif selected == "matrix":
             speed = 120
-        elif selected == "rock":
-            speed = 100
+        elif selected == "zen":
+            speed = 150
 
         self.play_animation(selected, loop=False, speed_ms=speed)
 
@@ -636,20 +640,21 @@ class ClaudeTaskbarWidget(QWidget):
             ("jump", 100),
             ("heart", 130),
             ("dance", 120),
-            ("cool", 130),
+            ("spark", 110),
+            ("chat", 120),
+            ("bug", 110),
+            ("shield", 120),
+            ("battery", 110),
+            ("origami", 130),
+            ("stars", 130),
+            ("tea", 130),
+            ("coffee", 140),
+            ("wizard", 120),
+            ("workout", 120),
+            ("ghost", 110),
+            ("pizza", 120),
             ("idea", 120),
             ("spin", 90),
-            ("rock", 100),
-            ("dab", 110),
-            ("applause", 110),
-            ("wizard", 120),
-            ("superhero", 100),
-            ("workout", 120),
-            ("disco", 120),
-            ("ghost", 110),
-            ("rage", 100),
-            ("cat", 130),
-            ("pizza", 120),
         ]
         name, speed = random.choice(reactions)
         self.play_animation(name, loop=False, speed_ms=speed)
@@ -987,46 +992,46 @@ class ClaudeTaskbarWidget(QWidget):
             }
         """)
 
-        # Animations submenu with 32 animations categorized
-        anim_menu = menu.addMenu("🎭 Анимации (32)")
+        # Animations submenu with 30 animations categorized
+        anim_menu = menu.addMenu("🎭 Анимации (30)")
 
         categories = [
+            ("✨ Фирменный Claude & AI", [
+                ("✨ Искра Claude (Spark)", "spark", 110, False),
+                ("💬 Ответ Claude (Chat ...)", "chat", 120, False),
+                ("🛡️ Защитный купол (Shield)", "shield", 120, False),
+                ("⚡ Подзарядка 100% (Battery)", "battery", 110, False),
+                ("🔍 Кибер-сканер (Scan)", "scan", 120, False),
+                ("🟢 Матрица / Хакер (Matrix)", "matrix", 120, True),
+            ]),
+            ("💻 Работа и код", [
+                ("💻 Кодить за ноутбуком (Typing)", "typing", 110, True),
+                ("🐛 Поимка бага (Bug -> ✔)", "bug", 110, False),
+                ("💡 Осенила идея (Idea)", "idea", 120, False),
+                ("☕ Чашка кофе (Coffee)", "coffee", 140, False),
+                ("🍵 Уютный чай (Tea)", "tea", 130, False),
+            ]),
             ("😊 Эмоции и жесты", [
                 ("👋 Помахать рукой (Wave)", "wave", 110, False),
                 ("🎉 Радость (Cheer)", "cheer", 120, False),
                 ("🦘 Прыжок (Jump)", "jump", 100, False),
                 ("💃 Весёлый танец (Dance)", "dance", 120, True),
                 ("💖 Любовь и сердечко (Heart)", "heart", 130, False),
-                ("🕶️ Крутой в очках (Cool)", "cool", 130, False),
-                ("👏 Аплодисменты (Applause)", "applause", 110, False),
-                ("🤙 Победный дэб (Dab)", "dab", 110, False),
                 ("😭 Аниме-плач (Cry)", "cry", 110, False),
-                ("🥱 Зевнуть и потянуться (Yawn)", "yawn", 140, False),
                 ("❓ Недоумение (Question)", "question", 130, False),
                 ("👀 Оглядеться по сторонам", "look_around", 130, False),
                 ("😉 Моргнуть (Blink)", "blink", 90, False),
             ]),
-            ("💻 Работа и код", [
-                ("💻 Кодить за ноутбуком (Typing)", "typing", 110, True),
-                ("🟢 Матрица / Хакер (Matrix)", "matrix", 120, True),
-                ("💡 Осенила идея (Idea)", "idea", 120, False),
-                ("📖 Читать документацию (Read)", "read", 130, False),
-                ("☕ Выпить чашку кофе (Coffee)", "coffee", 140, False),
-            ]),
-            ("🔥 Мемы и юмор", [
+            ("🧘 Уют и творчество", [
+                ("🧘 Дзен / Медитация (Zen)", "zen", 150, True),
+                ("⛵ Бумажный кораблик (Origami)", "origami", 130, False),
+                ("⭐ Звездопад / Созвездие (Stars)", "stars", 130, False),
                 ("🍕 Кушать пиццу (Pizza)", "pizza", 120, False),
-                ("💥 Рейдж / Переворот стола (Rage)", "rage", 100, False),
-                ("🎸 Рок-концерт (Rock)", "rock", 100, True),
-                ("☕🔥 This is Fine (В огне)", "fire", 130, False),
-                ("🐱 Котик на голове (Cat)", "cat", 130, True),
-                ("💰 Денежный дождь (Money)", "money", 120, False),
-                ("🪩 Диско-вечеринка (Disco)", "disco", 120, True),
             ]),
-            ("✨ Магия и экшен", [
+            ("🧙 Экшен и магия", [
                 ("🧙 Волшебник (Wizard)", "wizard", 120, False),
-                ("🦸 Супермен / Полёт (Superhero)", "superhero", 100, False),
-                ("👻 Привидение / Бу! (Ghost)", "ghost", 110, False),
                 ("🏋️ Качалка / Штанга (Workout)", "workout", 120, False),
+                ("👻 Привидение / Бу! (Ghost)", "ghost", 110, False),
                 ("🔄 Крутиться 360° (Spin)", "spin", 90, False),
                 ("🙈 Прятаться за панель (Peek)", "peek", 120, False),
             ]),
