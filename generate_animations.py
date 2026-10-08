@@ -847,10 +847,98 @@ def gen_shield():
     save_frame(base, "shield", 6)
 
 # ==========================================
-# Main: Run all generators (22 Animations)
+# 23. Drag (Поднят и перетягивается в воздухе / Дрыгает ногами и руками)
+# ==========================================
+def gen_drag():
+    def make_dangling_body(eye_dir=0):
+        g = make_empty_grid()
+        # Pinch at scruff
+        g[3][7] = C; g[3][8] = C
+        # Head
+        for x in range(4, 12):
+            g[4][x] = C
+            g[5][x] = C
+        # Surprised wide eyes
+        if eye_dir == 0:
+            g[5][5] = E; g[5][10] = E
+            g[4][5] = CD; g[4][10] = CD
+        elif eye_dir == -1: # looking down-left
+            g[5][4] = E; g[5][9] = E
+            g[4][4] = CD; g[4][9] = CD
+        else: # looking down-right
+            g[5][6] = E; g[5][11] = E
+            g[4][6] = CD; g[4][11] = CD
+        # Open surprised mouth
+        g[6][7] = E; g[6][8] = E
+        # Torso
+        for y in (6, 7, 8):
+            for x in range(4, 12):
+                if g[y][x] == T:
+                    g[y][x] = C
+        return g
+
+    # Frame 0: Left arm UP, Right arm DOWN; Left leg kicked forward, Right leg down
+    f0 = make_dangling_body(-1)
+    f0[5][2] = C; f0[5][3] = C; f0[6][2] = C; f0[6][3] = C
+    f0[7][12] = C; f0[7][13] = C; f0[8][12] = C; f0[8][13] = C
+    f0[9][5] = C; f0[9][6] = C; f0[10][4] = C; f0[10][5] = C; f0[11][3] = C; f0[11][4] = C
+    f0[9][9] = C; f0[9][10] = C; f0[10][9] = C; f0[10][10] = C; f0[11][10] = C; f0[12][10] = C
+    save_frame(f0, "drag", 0)
+
+    # Frame 1: Left arm MID, Right arm UP; Legs cycling
+    f1 = make_dangling_body(0)
+    f1[6][2] = C; f1[6][3] = C; f1[7][2] = C; f1[7][3] = C
+    f1[5][12] = C; f1[5][13] = C; f1[6][12] = C; f1[6][13] = C
+    f1[9][5] = C; f1[9][6] = C; f1[10][5] = C; f1[10][6] = C; f1[11][5] = C
+    f1[9][9] = C; f1[9][10] = C; f1[10][9] = C; f1[10][10] = C; f1[11][8] = C
+    save_frame(f1, "drag", 1)
+
+    # Frame 2: Left arm DOWN, Right arm MID; Right leg kicked forward, Left leg down
+    f2 = make_dangling_body(1)
+    f2[7][2] = C; f2[7][3] = C; f2[8][2] = C; f2[8][3] = C
+    f2[6][12] = C; f2[6][13] = C; f2[7][12] = C; f2[7][13] = C
+    f2[9][5] = C; f2[9][6] = C; f2[10][5] = C; f2[10][6] = C; f2[11][5] = C; f2[12][5] = C
+    f2[9][9] = C; f2[9][10] = C; f2[10][10] = C; f2[10][11] = C; f2[11][11] = C; f2[11][12] = C
+    save_frame(f2, "drag", 2)
+
+    # Frame 3: Left arm UP, Right arm DOWN; bicycle kick splay + sweat drop
+    f3 = make_dangling_body(0)
+    f3[5][2] = C; f3[5][3] = C; f3[6][2] = C; f3[6][3] = C
+    f3[7][12] = C; f3[7][13] = C; f3[8][12] = C; f3[8][13] = C
+    f3[9][5] = C; f3[9][6] = C; f3[10][4] = C; f3[10][5] = C; f3[11][4] = C
+    f3[9][9] = C; f3[9][10] = C; f3[10][10] = C; f3[10][11] = C; f3[11][10] = C
+    f3[3][13] = CY
+    save_frame(f3, "drag", 3)
+
+# ==========================================
+# 24. Land (Приземление на пол после перетаскивания)
+# ==========================================
+def gen_land():
+    # Frame 0: Impact squish (1px lower, wider knees, blush/puffed cheeks)
+    f0 = make_empty_grid()
+    for x in range(3, 13):
+        f0[5][x] = C; f0[6][x] = C
+    f0[6][5] = CD; f0[6][10] = CD
+    f0[6][4] = P; f0[6][11] = P
+    for x in range(2, 14):
+        f0[7][x] = C; f0[8][x] = C
+    for x in range(3, 13):
+        f0[9][x] = C
+    for x in range(4, 12):
+        f0[10][x] = C
+    for x in (4, 5, 6, 9, 10, 11):
+        f0[12][x] = C
+    save_frame(f0, "land", 0)
+
+    # Frame 1: Spring up / recovery
+    f1 = get_base_grid()
+    save_frame(f1, "land", 1)
+
+# ==========================================
+# Main: Run all generators
 # ==========================================
 def main():
-    print("Generating pixel art animation frames for 22 Claude animations...")
+    print("Generating pixel art animation frames for Claude animations...")
     # Classic & Core
     gen_blink()
     gen_look_around()
@@ -877,8 +965,12 @@ def main():
     gen_chat()
     gen_shield()
 
+    # Physics / Interactive Drag & Land
+    gen_drag()
+    gen_land()
+
     count = len([f for f in os.listdir(OUTPUT_DIR) if f.endswith(".png")])
-    print(f"Successfully generated {count} animation frames across 22 animations in {OUTPUT_DIR}!")
+    print(f"Successfully generated {count} animation frames in {OUTPUT_DIR}!")
 
 if __name__ == "__main__":
     main()
