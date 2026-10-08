@@ -6,9 +6,10 @@ import time
 import random
 import ctypes
 from ctypes import wintypes
-from PyQt6.QtWidgets import QApplication, QWidget, QMenu
-from PyQt6.QtGui import QImage, QPixmap, QPainter, QCursor, QColor
-from PyQt6.QtCore import Qt, QTimer, QPoint
+from PyQt6.QtWidgets import QApplication, QWidget, QMenu, QSystemTrayIcon
+from PyQt6.QtGui import QImage, QPixmap, QPainter, QCursor, QColor, QPen, QIcon
+from PyQt6.QtCore import Qt, QTimer, QPoint, QRect
+import winreg
 
 try:
     import psutil
@@ -132,6 +133,207 @@ except Exception:
         return val
 
 
+
+# --- Windows Autostart Management ---
+RUN_REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+APP_REG_NAME = "ClaudeTaskbar"
+
+def is_autostart_configured() -> bool:
+    """Checks if autostart at Windows boot is configured in HKCU Run registry."""
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_REG_KEY, 0, winreg.KEY_READ)
+        val, _ = winreg.QueryValueEx(key, APP_REG_NAME)
+        winreg.CloseKey(key)
+        return bool(val)
+    except Exception:
+        return False
+
+def set_autostart_configured(enabled: bool) -> bool:
+    """Enables or disables autostart at Windows login."""
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_REG_KEY, 0, winreg.KEY_SET_VALUE | winreg.KEY_QUERY_VALUE)
+        if enabled:
+            py_exe = sys.executable
+            pyw_exe = os.path.join(os.path.dirname(py_exe), "pythonw.exe")
+            runner = pyw_exe if os.path.exists(pyw_exe) else py_exe
+            script_path = os.path.abspath(os.path.join(BASE_DIR, "claude_taskbar.py"))
+            cmd = f'"{runner}" "{script_path}"'
+            winreg.SetValueEx(key, APP_REG_NAME, 0, winreg.REG_SZ, cmd)
+        else:
+            try:
+                winreg.DeleteValue(key, APP_REG_NAME)
+            except FileNotFoundError:
+                pass
+        winreg.CloseKey(key)
+        return True
+    except Exception as e:
+        print("Failed to set autostart in registry:", e)
+        return False
+
+
+# --- Taskbar Roaming Zone Overlay (Draggable & Resizable Blue Interval) ---
+class RoamZoneOverlayWidget(QWidget):
+    """
+    Semi-transparent blue interval overlay directly on the taskbar.
+    Color matches user screenshot: rgba(35, 116, 222, 0.38) with handles on left & right.
+    Users can drag the entire box or adjust its edges anywhere across the taskbar.
+    """
+    def __init__(self, claude_widget):
+        super().__init__()
+        self.claude_widget = claude_widget
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setMouseTracking(True)
+
+        self.drag_mode = None  # None, "move", "left", "right"
+        self.drag_start_global_x = 0
+        self.drag_start_geo = None
+
+        self.sync_geometry()
+
+    def sync_geometry(self):
+        tray_r = self.claude_widget.get_tray_rect()
+        if tray_r:
+            tray_top = tray_r.top
+            tray_h = tray_r.bottom - tray_r.top
+            tray_left = tray_r.left
+            tray_w = tray_r.right - tray_r.left
+        else:
+            screen = self.claude_widget.get_current_screen()
+            geom = screen.geometry()
+            tray_top = geom.bottom() - 48
+            tray_h = 48
+            tray_left = geom.left()
+            tray_w = geom.width()
+
+        self.claude_widget.ensure_roam_bounds()
+        min_x = max(tray_left, self.claude_widget.roam_screen_min_x)
+        max_x = min(tray_left + tray_w, self.claude_widget.roam_screen_max_x)
+        w = max(120, max_x - min_x)
+
+        self.setGeometry(min_x, tray_top, w, tray_h)
+
+    def is_over_close_btn(self, pt):
+        return pt.x() >= self.width() - 28 and pt.y() <= 24
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Cancel any ongoing slow roaming step immediately
+            if self._roam_step_timer.isActive():
+                self._roam_step_timer.stop()
+                self._roam_steps_remaining = 0
+            pos = event.pos()
+            if self.is_over_close_btn(pos):
+                self.hide()
+                return
+
+            self.drag_start_global_x = event.globalPosition().toPoint().x()
+            self.drag_start_geo = self.geometry()
+
+            if pos.x() <= 14:
+                self.drag_mode = "left"
+            elif pos.x() >= self.width() - 14:
+                self.drag_mode = "right"
+            else:
+                self.drag_mode = "move"
+
+    def mouseMoveEvent(self, event):
+        pos = event.pos()
+        if self.drag_mode is None:
+            if self.is_over_close_btn(pos):
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
+            elif pos.x() <= 14 or pos.x() >= self.width() - 14:
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+            else:
+                self.setCursor(Qt.CursorShape.SizeAllCursor)
+            return
+
+        delta_x = event.globalPosition().toPoint().x() - self.drag_start_global_x
+        tray_r = self.claude_widget.get_tray_rect()
+        tray_left = tray_r.left if tray_r else 0
+        tray_right = tray_r.right if tray_r else 1920
+
+        if self.drag_mode == "move":
+            new_x = self.drag_start_geo.x() + delta_x
+            new_x = max(tray_left, min(tray_right - self.drag_start_geo.width(), new_x))
+            self.move(new_x, self.y())
+
+        elif self.drag_mode == "left":
+            new_x = self.drag_start_geo.x() + delta_x
+            new_w = self.drag_start_geo.width() - delta_x
+            if new_w >= 120 and new_x >= tray_left:
+                self.setGeometry(new_x, self.y(), new_w, self.height())
+
+        elif self.drag_mode == "right":
+            new_w = self.drag_start_geo.width() + delta_x
+            if new_w >= 120 and (self.x() + new_w <= tray_right):
+                self.resize(new_w, self.height())
+
+        self.claude_widget.roam_screen_min_x = self.x()
+        self.claude_widget.roam_screen_max_x = self.x() + self.width()
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drag_mode = None
+            self.claude_widget.roam_screen_min_x = self.x()
+            self.claude_widget.roam_screen_max_x = self.x() + self.width()
+            self.claude_widget.save_config()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        w = self.width()
+        h = self.height()
+
+        # Exact sampled blue from screenshot: (35, 116, 222)
+        fill_color = QColor(35, 116, 222, 95)
+        border_color = QColor(109, 167, 236, 230)
+        handle_color = QColor(52, 135, 236, 240)
+
+        # Background fill and outline
+        painter.setBrush(fill_color)
+        painter.setPen(QPen(border_color, 2))
+        painter.drawRoundedRect(1, 1, w - 2, h - 2, 4, 4)
+
+        # Left Handle Grip
+        painter.setBrush(handle_color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(2, 4, 10, h - 8, 3, 3)
+        painter.setBrush(QColor(255, 255, 255, 200))
+        for dot_y in (h // 2 - 6, h // 2, h // 2 + 6):
+            painter.drawEllipse(6, dot_y, 2, 2)
+
+        # Right Handle Grip
+        painter.setBrush(handle_color)
+        painter.drawRoundedRect(w - 12, 4, 10, h - 8, 3, 3)
+        painter.setBrush(QColor(255, 255, 255, 200))
+        for dot_y in (h // 2 - 6, h // 2, h // 2 + 6):
+            painter.drawEllipse(w - 8, dot_y, 2, 2)
+
+        # Close button [✕] at top right
+        painter.setPen(QColor(210, 230, 255, 220))
+        font = painter.font()
+        font.setPixelSize(12)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(w - 24, 16, "✕")
+
+        # Center Label Badge
+        painter.setPen(QColor(255, 255, 255, 240))
+        font.setPixelSize(11)
+        font.setBold(False)
+        painter.setFont(font)
+        label_text = f"🚶 Зона прогулки Claude [{self.x()} — {self.x() + w}px]"
+        painter.drawText(QRect(14, 0, w - 42, h), Qt.AlignmentFlag.AlignCenter, label_text)
+
+
 class ClaudeTaskbarWidget(QWidget):
     def __init__(self):
         super().__init__()
@@ -150,25 +352,36 @@ class ClaudeTaskbarWidget(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        # Settings
+        # Settings (Living mode & Fullscreen hiding are ALWAYS permanently active)
         self.scale_factor = 3
         self.placement_mode = "bottom"  # "bottom" (inside taskbar) or "top" (on top of taskbar ledge)
-        self.auto_peek_on_shell = False  # Not needed: tray ownership keeps Claude 100% visible inside taskbar
+        self.auto_peek_on_shell = False
         self.is_peeked_up = False
-        self.snap_to_taskbar = True  # Magnetic snapping to taskbar
-        self.idle_animations_enabled = True
-        self.auto_hide_fullscreen = False
+        self.snap_to_taskbar = True
+        self.idle_animations_enabled = True  # Always permanently active
+        self.auto_hide_fullscreen = True     # Always permanently active
 
         # Smart Context state (Claude Code live coding, AFK sleep, IDE focus)
-        self.smart_context_enabled = True
+        self.smart_context_enabled = True   # Always permanently active
         self.is_claude_coding = False
         self.is_sleeping_afk = False
         self._last_coding_time = 0.0
         self._current_coding_project = ""
-        self._current_coding_project = ""
         self._recent_idle_history = []
-        self.idle_frequency_mode = "normal"  # "active" (6-12s), "normal" (12-22s), "relaxed" (25-50s)
-        self._current_laptop_anim_idx = 0
+        self.idle_frequency_mode = "normal"
+
+        # Roam Zone (Slow occasional wandering within semi-transparent blue interval)
+        self.roam_enabled = True
+        self.roam_screen_min_x = None
+        self.roam_screen_max_x = None
+        self.roam_overlay = None
+        self.roam_timer = QTimer(self)
+        self.roam_timer.timeout.connect(self._trigger_slow_roam)
+        self._roam_step_timer = QTimer(self)
+        self._roam_step_timer.timeout.connect(self._execute_roam_step)
+        self._roam_steps_remaining = 0
+        self._roam_direction = 0
+        self._roam_walk_frame = 0
 
         # State
         self.current_anim_name = "idle"
@@ -224,6 +437,19 @@ class ClaudeTaskbarWidget(QWidget):
         self.context_timer = QTimer(self)
         self.context_timer.timeout.connect(self._check_contextual_state)
         self.context_timer.start(1000)
+
+        # Automatically ensure Windows Autostart on boot is active
+        if not is_autostart_configured():
+            set_autostart_configured(True)
+
+        # Roam Zone overlay widget instance
+        self.roam_overlay = RoamZoneOverlayWidget(self)
+
+        # Setup System Tray Icon & Context Menu (with base icon)
+        self.setup_tray_icon()
+
+        # Start wandering timer (runs every 2.5 to 5 minutes)
+        self._schedule_next_roam(150, 300)
 
         # Initial frame
         self.play_idle()
@@ -864,8 +1090,13 @@ class ClaudeTaskbarWidget(QWidget):
                     self.snap_to_taskbar = data.get("snap_to_taskbar", True)
                     self.idle_animations_enabled = data.get("idle_animations_enabled", True)
                     self.auto_hide_fullscreen = data.get("auto_hide_fullscreen", False)
-                    self.smart_context_enabled = data.get("smart_context_enabled", True)
-                    self.idle_frequency_mode = data.get("idle_frequency_mode", "normal")
+                    self.smart_context_enabled = True
+                    self.idle_animations_enabled = True
+                    self.auto_hide_fullscreen = True
+                    self.idle_frequency_mode = "normal"
+                    self.roam_enabled = data.get("roam_enabled", True)
+                    self.roam_screen_min_x = data.get("roam_screen_min_x", None)
+                    self.roam_screen_max_x = data.get("roam_screen_max_x", None)
                     if "x" in data and "y" in data:
                         self.saved_pos = QPoint(data["x"], data["y"])
             except Exception as e:
@@ -902,8 +1133,11 @@ class ClaudeTaskbarWidget(QWidget):
                 "snap_to_taskbar": self.snap_to_taskbar,
                 "idle_animations_enabled": self.idle_animations_enabled,
                 "auto_hide_fullscreen": self.auto_hide_fullscreen,
-                "smart_context_enabled": self.smart_context_enabled,
-                "idle_frequency_mode": self.idle_frequency_mode
+                "smart_context_enabled": True,
+                "idle_frequency_mode": self.idle_frequency_mode,
+                "roam_enabled": self.roam_enabled,
+                "roam_screen_min_x": self.roam_screen_min_x,
+                "roam_screen_max_x": self.roam_screen_max_x
             }
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -955,19 +1189,7 @@ class ClaudeTaskbarWidget(QWidget):
 
     # --- Smart Context Logic (Claude Code, AFK Sleep, IDE Focus) ---
 
-    LAPTOP_ANIMATIONS = [
-        ("laptop_front", 110, "💻 Фронтальный по центру"),
-        ("laptop_classic", 110, "💻 Классический ультрабук сбоку"),
-        ("laptop_retro", 110, "📟 Ретро-терминал ThinkPad"),
-        ("laptop_dual", 110, "📱 Двухэкранный Fold"),
-        ("laptop_rgb", 85, "🌈 Геймерский RGB"),
-        ("laptop_cyberdeck", 100, "🎮 Портативный Кибердек"),
-    ]
 
-    def _pick_next_laptop_anim(self):
-        item = self.LAPTOP_ANIMATIONS[self._current_laptop_anim_idx % len(self.LAPTOP_ANIMATIONS)]
-        self._current_laptop_anim_idx += 1
-        return item[0], item[1]
 
     def _poll_claude_code(self):
         """
@@ -1118,34 +1340,29 @@ class ClaudeTaskbarWidget(QWidget):
             self.is_claude_coding = True
             self.is_sleeping_afk = False
             self.idle_timer.stop()
+            if self._roam_step_timer.isActive():
+                self._roam_step_timer.stop()
+            self.roam_timer.stop()
             proj_label = f" ({self._current_coding_project})" if self._current_coding_project else ""
             self.setToolTip(f"Claude Mascot — 💻 Пишет код{proj_label}")
-            anim, spd = self._pick_next_laptop_anim()
-            self.play_animation(anim, loop=True, speed_ms=spd)
+            # Classic laptop animation (typing) as originally was!
+            self.play_animation("typing", loop=True, speed_ms=110)
             return
 
         elif not is_coding and self.is_claude_coding:
             # Transition: Claude Code finished coding!
             self.is_claude_coding = False
             self.setToolTip("Claude Mascot — ✨ Код готов!")
-            # Victory celebration requested by user: cheer or spark
             celebration = random.choice(["cheer", "spark"])
             def on_celebration_done():
                 self.setToolTip("Claude Mascot")
                 self.play_idle()
                 self._schedule_next_idle(8000, 20000)
+                self._schedule_next_roam(120, 240)
             self.play_animation(celebration, loop=False, speed_ms=120, on_finished=on_celebration_done)
             return
 
-        # If currently busy writing code with Claude Code, periodically cycle laptop animations!
         if self.is_claude_coding:
-            if hasattr(self, "_last_laptop_switch_time"):
-                if now - self._last_laptop_switch_time > 12.0:
-                    self._last_laptop_switch_time = now
-                    anim, spd = self._pick_next_laptop_anim()
-                    self.play_animation(anim, loop=True, speed_ms=spd)
-            else:
-                self._last_laptop_switch_time = now
             return
 
         # --- 2. AFK Inactivity Check (5 minutes = 300 seconds) ---
@@ -1178,6 +1395,10 @@ class ClaudeTaskbarWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
+            # Cancel any ongoing slow roaming step immediately
+            if self._roam_step_timer.isActive():
+                self._roam_step_timer.stop()
+                self._roam_steps_remaining = 0
             self.drag_start_pos = event.globalPosition().toPoint()
             self.is_dragging = False
             self.is_lifted = False
@@ -1332,15 +1553,182 @@ class ClaudeTaskbarWidget(QWidget):
         except Exception:
             pass
 
-    # --- Context Menu ---
+    # --- Roam & Wander Zone Logic ---
 
-    def contextMenuEvent(self, event):
-        menu = QMenu(self)
-        menu.setStyleSheet("""
+    def ensure_roam_bounds(self):
+        """Ensures valid roaming screen bounds are configured."""
+        tray_r = self.get_tray_rect()
+        if tray_r:
+            tray_left = tray_r.left
+            tray_w = tray_r.right - tray_r.left
+        else:
+            screen = self.get_current_screen()
+            geom = screen.geometry()
+            tray_left = geom.left()
+            tray_w = geom.width()
+
+        if self.roam_screen_min_x is None or self.roam_screen_max_x is None or self.roam_screen_max_x <= self.roam_screen_min_x:
+            # Default zone: right-center portion of the taskbar
+            self.roam_screen_min_x = int(tray_left + tray_w * 0.40)
+            self.roam_screen_max_x = int(tray_left + tray_w * 0.85)
+
+    def _schedule_next_roam(self, min_s=150, max_s=300):
+        """Schedules the next slow, occasional wandering step in 2.5 to 5 minutes."""
+        if not getattr(self, "roam_enabled", True):
+            self.roam_timer.stop()
+            return
+        delay_ms = random.randint(min_s, max_s) * 1000
+        self.roam_timer.stop()
+        self.roam_timer.start(delay_ms)
+
+    def _trigger_slow_roam(self):
+        """Triggers a sequence of slow, gentle steps within the blue roam interval."""
+        if not getattr(self, "roam_enabled", True) or self.is_dragging or getattr(self, "is_lifted", False):
+            self._schedule_next_roam()
+            return
+        if self.is_claude_coding or self.is_sleeping_afk or self.hidden_by_fullscreen:
+            self._schedule_next_roam()
+            return
+        if self.current_anim_name != "idle":
+            self._schedule_next_roam(60, 120)
+            return
+
+        self.ensure_roam_bounds()
+
+        tray_r = self.get_tray_rect()
+        tray_left = tray_r.left if tray_r else 0
+        tray_w = (tray_r.right - tray_r.left) if tray_r else 1920
+
+        if self.placement_mode == "bottom" and self._is_embedded:
+            curr_x = self.x()
+            min_local_x = max(0, self.roam_screen_min_x - tray_left)
+            max_local_x = min(tray_w - self.width(), self.roam_screen_max_x - tray_left - self.width())
+        else:
+            curr_x = self.x()
+            min_local_x = self.roam_screen_min_x
+            max_local_x = self.roam_screen_max_x - self.width()
+
+        if max_local_x <= min_local_x:
+            self._schedule_next_roam()
+            return
+
+        # Choose direction: bias away from the boundaries
+        if curr_x <= min_local_x + 16:
+            direction = 1
+        elif curr_x >= max_local_x - 16:
+            direction = -1
+        else:
+            direction = random.choice([-1, 1])
+
+        # Step count: 3 to 6 steps
+        self._roam_steps_remaining = random.randint(3, 6)
+        self._roam_direction = direction
+        self._roam_min_x = min_local_x
+        self._roam_max_x = max_local_x
+        self._roam_walk_frame = 0
+
+        # Execute steps slowly every 240ms
+        self._roam_step_timer.start(240)
+
+    def _execute_roam_step(self):
+        """Executes a single slow step (4px per step) with cute walking animation."""
+        if self.is_dragging or getattr(self, "is_lifted", False) or self.is_claude_coding or self.is_sleeping_afk:
+            self._roam_step_timer.stop()
+            self.play_idle()
+            self._schedule_next_roam()
+            return
+
+        if self._roam_steps_remaining <= 0:
+            self._roam_step_timer.stop()
+            self.play_idle()
+            if random.random() < 0.6:
+                self.play_animation("look_around", loop=False, speed_ms=130, on_finished=self.play_idle)
+            self.save_config()
+            self._schedule_next_roam()
+            return
+
+        self._roam_steps_remaining -= 1
+
+        curr_x = self.x()
+        step_dx = self._roam_direction * 4
+        new_x = max(self._roam_min_x, min(self._roam_max_x, curr_x + step_dx))
+
+        if self.placement_mode == "bottom" and self._is_embedded and user32:
+            tray_r = self.get_tray_rect()
+            tray_h = (tray_r.bottom - tray_r.top) if tray_r else 48
+            floor_y = tray_h - (12 * self.scale_factor)
+            hwnd = int(self.winId())
+            user32.SetWindowPos(hwnd, 0, new_x, floor_y, self.width(), self.height(), 0x0040)
+            user32.BringWindowToTop(hwnd)
+        else:
+            self.move(new_x, self.y())
+            self.assert_topmost()
+
+        # Alternate walking frames
+        self._roam_walk_frame = (self._roam_walk_frame + 1) % 4
+        self.play_animation("walk", loop=False)
+        self.current_frame_idx = self._roam_walk_frame
+        self._update_current_pixmap()
+
+    def toggle_roam_enabled(self):
+        self.roam_enabled = not self.roam_enabled
+        if self.roam_enabled:
+            self._schedule_next_roam(60, 180)
+        else:
+            self.roam_timer.stop()
+            self._roam_step_timer.stop()
+        self.save_config()
+        self.rebuild_tray_menu()
+
+    def toggle_roam_overlay(self):
+        if not self.roam_overlay:
+            self.roam_overlay = RoamZoneOverlayWidget(self)
+
+        if self.roam_overlay.isVisible():
+            self.roam_overlay.hide()
+        else:
+            self.roam_overlay.sync_geometry()
+            self.roam_overlay.show()
+            self.roam_overlay.raise_()
+
+    def reset_roam_bounds(self):
+        self.roam_screen_min_x = None
+        self.roam_screen_max_x = None
+        self.ensure_roam_bounds()
+        if self.roam_overlay and self.roam_overlay.isVisible():
+            self.roam_overlay.sync_geometry()
+            self.roam_overlay.update()
+        self.save_config()
+
+    def toggle_autostart(self):
+        new_state = not is_autostart_configured()
+        set_autostart_configured(new_state)
+        self.rebuild_tray_menu()
+
+    # --- System Tray & Context Menu ---
+
+    def setup_tray_icon(self):
+        """Initializes the System Tray Icon with base.png and context menu."""
+        self.tray_icon = QSystemTrayIcon(self)
+        base_pix = QPixmap(BASE_IMAGE_PATH).scaled(
+            32, 32,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation
+        )
+        self.tray_icon.setIcon(QIcon(base_pix))
+        self.tray_icon.setToolTip("Claude Mascot")
+        self.rebuild_tray_menu()
+        self.tray_icon.setContextMenu(self.tray_menu)
+        self.tray_icon.show()
+
+    def rebuild_tray_menu(self):
+        """Constructs a clean, modern dark menu without clutter."""
+        self.tray_menu = QMenu(self)
+        self.tray_menu.setStyleSheet("""
             QMenu {
-                background-color: #242424;
+                background-color: #1e1e1e;
                 color: #f0f0f0;
-                border: 1px solid #444444;
+                border: 1px solid #383838;
                 border-radius: 8px;
                 padding: 6px;
                 font-family: 'Segoe UI', sans-serif;
@@ -1356,95 +1744,33 @@ class ClaudeTaskbarWidget(QWidget):
             }
             QMenu::separator {
                 height: 1px;
-                background-color: #3d3d3d;
+                background-color: #333333;
                 margin: 4px 8px;
             }
         """)
 
-        # Animations submenu with 28 animations categorized
-        anim_menu = menu.addMenu("🎭 Анимации (28)")
+        # 1. Roam Zone Controls
+        roam_menu = self.tray_menu.addMenu("🟦 Зона прогулки (интервал)")
+        roam_act = roam_menu.addAction(f"{'✓ ' if self.roam_enabled else '   '}🚶 Разрешить медленные шаги")
+        roam_act.triggered.connect(self.toggle_roam_enabled)
 
-        categories = [
-            ("✨ Фирменный Claude & AI", [
-                ("✨ Искра Claude (Spark)", "spark", 110, False),
-                ("💬 Ответ Claude (Chat ...)", "chat", 120, False),
-                ("🛡️ Защитный купол (Shield)", "shield", 120, False),
-                ("🟢 Матрица / Хакер (Matrix)", "matrix", 120, True),
-            ]),
-            ("💻 Ноутбук (6 вариантов формы)", [
-                ("💻 Фронтальный по центру (Front)", "laptop_front", 110, True),
-                ("💻 Классический ультрабук (Classic)", "laptop_classic", 110, True),
-                ("📟 Ретро-терминал ThinkPad (Retro)", "laptop_retro", 110, True),
-                ("📱 Двухэкранный Fold (Dual)", "laptop_dual", 110, True),
-                ("🌈 Геймерский RGB (Rainbow)", "laptop_rgb", 85, True),
-                ("🎮 Кибердек в лапках (Cyberdeck)", "laptop_cyberdeck", 100, True),
-                ("💻 Длинная сессия с билдом (Typing)", "typing", 110, True),
-            ]),
-            ("☕ Отдых и вдохновение", [
-                ("💡 Осенила идея (Idea)", "idea", 120, False),
-                ("☕ Чашка кофе (Coffee)", "coffee", 130, False),
-            ]),
-            ("😊 Эмоции и жесты", [
-                ("👋 Помахать рукой (Wave)", "wave", 110, False),
-                ("🎉 Радость (Cheer)", "cheer", 120, False),
-                ("🦘 Прыжок (Jump)", "jump", 100, False),
-                ("💃 Весёлый танец (Dance)", "dance", 120, True),
-                ("💖 Любовь и сердечко (Heart)", "heart", 130, False),
-                ("😭 Аниме-плач (Cry)", "cry", 110, False),
-                ("❓ Недоумение (Question)", "question", 130, False),
-                ("👀 Оглядеться по сторонам", "look_around", 130, False),
-                ("😉 Моргнуть (Blink)", "blink", 90, False),
-            ]),
-            ("🏃 Физика и интерактив", [
-                ("🏃 Поднятие (Drag)", "drag", 90, True),
-                ("🛬 Приземление (Land)", "land", 100, False),
-            ]),
-            ("🧙 Экшен и магия", [
-                ("🧙 Волшебник (Wizard)", "wizard", 120, False),
-                ("🏋️ Качалка / Штанга (Workout)", "workout", 120, False),
-                ("🔄 Крутиться 360° (Spin)", "spin", 90, False),
-                ("🙈 Прятаться за панель (Peek)", "peek", 120, False),
-            ]),
-            ("💤 Режимы", [
-                ("💤 Заснуть (Sleep)", "sleep", 200, True),
-                ("🛑 Обычный вид (Idle)", "idle", 100, False),
-            ])
-        ]
+        show_zone_act = roam_menu.addAction("🟦 Настроить зону (показать синий интервал)...")
+        show_zone_act.triggered.connect(self.toggle_roam_overlay)
 
-        for cat_title, items in categories:
-            sub = anim_menu.addMenu(cat_title)
-            for title, anim_name, speed, loop in items:
-                act = sub.addAction(title)
-                act.triggered.connect(lambda checked=False, a=anim_name, s=speed, l=loop: self.play_animation(a, loop=l, speed_ms=s))
+        reset_zone_act = roam_menu.addAction("🔄 Сбросить зону (по умолчанию)")
+        reset_zone_act.triggered.connect(self.reset_roam_bounds)
 
-        menu.addSeparator()
+        self.tray_menu.addSeparator()
 
-        # Smart Context toggle
-        smart_act = menu.addAction(f"{'✓ ' if self.smart_context_enabled else '   '}🧠 Умный контекст (Claude Code / AFK / IDE)")
-        smart_act.triggered.connect(self.toggle_smart_context)
+        # 2. Windows Autostart on boot
+        autostart_on = is_autostart_configured()
+        auto_act = self.tray_menu.addAction(f"{'✓ ' if autostart_on else '   '}🚀 Запускать при старте Windows")
+        auto_act.triggered.connect(self.toggle_autostart)
 
-        # Idle mode toggle
-        idle_act = menu.addAction(f"{'✓ ' if self.idle_animations_enabled else '   '}Живой режим (авто-анимации)")
-        idle_act.triggered.connect(self.toggle_idle_mode)
+        self.tray_menu.addSeparator()
 
-        # Idle frequency submenu
-        freq_menu = menu.addMenu("⏱ Частота анимаций")
-        freq_opts = [
-            ("⚡ Частый (каждые 6-12 сек)", "active"),
-            ("⏱ Обычный (каждые 12-22 сек)", "normal"),
-            ("🧘 Спокойный (каждые 25-50 сек)", "relaxed"),
-        ]
-        for title, mode in freq_opts:
-            is_active = (self.idle_frequency_mode == mode)
-            act = freq_menu.addAction(f"{'● ' if is_active else '   '}{title}")
-            act.triggered.connect(lambda checked=False, m=mode: self.set_idle_frequency(m))
-
-        # Fullscreen auto-hide toggle
-        fs_act = menu.addAction(f"{'✓ ' if self.auto_hide_fullscreen else '   '}Скрывать в полноэкранных играх")
-        fs_act.triggered.connect(self.toggle_fullscreen_mode)
-
-        # Scale submenu
-        scale_menu = menu.addMenu("📐 Размер")
+        # 3. Scale Submenu
+        scale_menu = self.tray_menu.addMenu("📐 Размер")
         scale_options = [
             ("Мини (16px, 2x)", 2),
             ("Половина высоты панели (24px, 3x)", 3),
@@ -1457,59 +1783,34 @@ class ClaudeTaskbarWidget(QWidget):
             act = scale_menu.addAction(f"{'✓ ' if self.scale_factor == factor else '   '}{title}")
             act.triggered.connect(lambda checked=False, f=factor: self.set_scale(f))
 
-        menu.addSeparator()
-
-        place_menu = menu.addMenu("📍 Позиция на панели")
+        # 4. Placement Submenu
+        place_menu = self.tray_menu.addMenu("📍 Позиция на панели")
         bot_act = place_menu.addAction(f"{'✓ ' if self.placement_mode == 'bottom' else '   '}Внутри панели (снизу экрана)")
         bot_act.triggered.connect(lambda: self.set_placement_mode("bottom"))
 
         top_act = place_menu.addAction(f"{'✓ ' if self.placement_mode == 'top' else '   '}Сверху панели (на бордюре)")
         top_act.triggered.connect(lambda: self.set_placement_mode("top"))
 
-        snap_act = menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}🧲 Магнититься к панели")
+        # 5. Snapping and Reset
+        snap_act = self.tray_menu.addAction(f"{'✓ ' if self.snap_to_taskbar else '   '}🧲 Магнититься к панели")
         snap_act.triggered.connect(self.toggle_snap_taskbar)
 
-        reset_pos_act = menu.addAction("🔄 Сбросить позицию (по умолчанию)")
+        reset_pos_act = self.tray_menu.addAction("🔄 Сбросить позицию Claude")
         reset_pos_act.triggered.connect(self.reset_to_default_pos)
 
-        menu.addSeparator()
+        self.tray_menu.addSeparator()
 
-        quit_act = menu.addAction("❌ Закрыть")
+        # 6. Exit
+        quit_act = self.tray_menu.addAction("❌ Закрыть")
         quit_act.triggered.connect(QApplication.instance().quit)
 
-        menu.exec(event.globalPos())
+        if hasattr(self, "tray_icon") and self.tray_icon:
+            self.tray_icon.setContextMenu(self.tray_menu)
 
-    def toggle_idle_mode(self):
-        self.idle_animations_enabled = not self.idle_animations_enabled
-        if self.idle_animations_enabled:
-            self._schedule_next_idle(5000, 15000)
-        else:
-            self.idle_timer.stop()
-        self.save_config()
-
-    def toggle_fullscreen_mode(self):
-        self.auto_hide_fullscreen = not self.auto_hide_fullscreen
-        if self.auto_hide_fullscreen:
-            self.fullscreen_timer.start(800)
-        else:
-            self.fullscreen_timer.stop()
-            if self.hidden_by_fullscreen:
-                self.hidden_by_fullscreen = False
-                self.show()
-                if self.placement_mode == "bottom":
-                    if not self._is_embedded:
-                        self.embed_in_taskbar()
-                else:
-                    self.assert_topmost()
-        self.save_config()
-
-    def sit_on_taskbar_top(self):
-        """Switches placement to sitting on top of the taskbar (recommended: never occluded)."""
-        self.set_placement_mode("top")
-
-    def sit_on_bottom_taskbar(self):
-        """Switches placement to sitting inside the taskbar (at the bottom of the screen)."""
-        self.set_placement_mode("bottom")
+    def contextMenuEvent(self, event):
+        """Right-clicking Claude directly on the taskbar also pops up the tray menu."""
+        if hasattr(self, "tray_menu"):
+            self.tray_menu.exec(event.globalPos())
 
     def set_placement_mode(self, mode):
         if self.placement_mode == mode:
@@ -1523,31 +1824,14 @@ class ClaudeTaskbarWidget(QWidget):
             self.unembed_from_taskbar()
 
         self.save_config()
-
-    def set_idle_frequency(self, mode):
-        self.idle_frequency_mode = mode
-        self.save_config()
-        self._schedule_next_idle()
-
-    def toggle_smart_context(self):
-        self.smart_context_enabled = not self.smart_context_enabled
-        self.save_config()
-        if not self.smart_context_enabled:
-            self.is_claude_coding = False
-            self.is_sleeping_afk = False
-            self.setToolTip("Claude Mascot")
-            self.play_idle()
-            self._schedule_next_idle(8000, 20000)
-
-    def toggle_auto_peek(self):
-        self.auto_peek_on_shell = not self.auto_peek_on_shell
-        self.save_config()
+        self.rebuild_tray_menu()
 
     def toggle_snap_taskbar(self):
         self.snap_to_taskbar = not self.snap_to_taskbar
         if self.snap_to_taskbar:
             self.move(self.clamp_position(self.pos()))
         self.save_config()
+        self.rebuild_tray_menu()
 
     def reset_to_default_pos(self):
         if self.placement_mode == "bottom" and self._is_embedded:

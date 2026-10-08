@@ -1142,6 +1142,29 @@ def gen_land():
     save_frame(f1, "land", 1)
 
 # ==========================================
+# 23. Walk (Медленные шажки)
+# ==========================================
+def gen_walk():
+    base = get_base_grid()
+    # 0: Left foot step (left outer leg lifted by 1px)
+    f0 = [row[:] for row in base]
+    f0[11][4] = T
+    save_frame(f0, "walk", 0)
+
+    # 1: Both feet planted
+    f1 = [row[:] for row in base]
+    save_frame(f1, "walk", 1)
+
+    # 2: Right foot step (right outer leg lifted by 1px)
+    f2 = [row[:] for row in base]
+    f2[11][11] = T
+    save_frame(f2, "walk", 2)
+
+    # 3: Both feet planted
+    f3 = [row[:] for row in base]
+    save_frame(f3, "walk", 3)
+
+# ==========================================
 # Main: Run all generators
 # ==========================================
 def main():
@@ -1177,9 +1200,10 @@ def main():
     gen_chat()
     gen_shield()
 
-    # Physics / Interactive Drag & Land
+    # Physics / Interactive Drag & Land & Walk
     gen_drag()
     gen_land()
+    gen_walk()
 
     count = len([f for f in os.listdir(OUTPUT_DIR) if f.endswith(".png")])
     print(f"Successfully generated {count} animation frames in {OUTPUT_DIR}!")
