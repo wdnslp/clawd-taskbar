@@ -1205,15 +1205,16 @@ class ClawdTaskbarWidget(QWidget):
                 ("wave", 12),
                 ("coffee", 8),
                 ("spark", 8),
-                ("matrix", 6),
-                ("wizard", 5),
+                ("matrix", 5),
                 ("idea", 5),
-                ("workout", 3),
+                ("wizard", 2),
+                ("workout", 2),
+                ("cry", 2),
                 ("shield", 2),
             ]
         else:
             # Cozy desktop: primarily default everyday movements (blink, look_around, dance, wave)
-            # Rare easter eggs have tiny 2-3% chance each!
+            # Rare easter eggs have tiny 2% chance each!
             all_choices = [
                 ("blink", 35),        # Default: natural cute blinking
                 ("look_around", 24),  # Default: curious looking around
@@ -1230,6 +1231,7 @@ class ClawdTaskbarWidget(QWidget):
                 ("chat", 3),          # Rare thought bubble
                 ("wizard", 2),        # Rare wizard hat magic
                 ("workout", 2),       # Rare barbell workout
+                ("cry", 2),           # Rare soft crying
                 ("shield", 2),        # Rare energy shield
                 ("question", 2),      # Rare question mark
                 ("spin", 2),          # Rare 360 spin
@@ -1262,6 +1264,7 @@ class ClawdTaskbarWidget(QWidget):
             "matrix": 110,
             "wizard": 120,
             "workout": 110,
+            "cry": 130,
             "dance": 120,
             "jump": 100,
             "heart": 130,
@@ -1284,6 +1287,7 @@ class ClawdTaskbarWidget(QWidget):
             self.setToolTip(self.t("tooltip_default"))
             self.play_animation("wave", loop=False, speed_ms=110, on_finished=self.play_idle)
             return
+        # Standard cheerful mascot reactions for clicks (wizard, workout, crying are spontaneous rare events)
         reactions = [
             ("wave", 110),
             ("cheer", 120),
@@ -1292,10 +1296,6 @@ class ClawdTaskbarWidget(QWidget):
             ("dance", 120),
             ("spark", 110),
             ("chat", 120),
-            ("shield", 120),
-            ("coffee", 140),
-            ("wizard", 120),
-            ("workout", 120),
             ("idea", 120),
             ("spin", 90),
         ]
@@ -2297,6 +2297,9 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("ClawdTaskbar")
+    icon_path = os.path.join(BASE_DIR, "assets", "app.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
     widget = ClawdTaskbarWidget()
     app.aboutToQuit.connect(widget.restore_taskbar_hole)
     widget.show()

@@ -28,3 +28,5 @@ scratch/
 *.log
 .DS_Store
 Thumbs.db
+generate_tiktok_content.py
+tiktok/
